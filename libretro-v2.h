@@ -47,7 +47,7 @@ extern "C" {
  * implementations.
  * It is not incremented for compatible changes to the API.
  */
-#define RETRO_API_VERSION         1
+#define RETRO_API_VERSION         2
 
 /*
  * Libretro's fundamental device abstractions.
