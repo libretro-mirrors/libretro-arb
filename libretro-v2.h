@@ -1860,8 +1860,9 @@ enum retro_pixel_format
    RETRO_PIXEL_FORMAT_UNKNOWN  = INT_MAX
 };
 /* Tells the core which pixel format the front prefers, and asks the core if
- * that is acceptable. The front will use the returned pixel format. */
-enum retro_pixel_format retro_get_pixel_format(enum retro_pixel_format);
+ * that is acceptable. The core can override the choice if it wants to.
+ * Can be called multiple times. The last return value applies. */
+enum retro_pixel_format retro_get_pixel_format(enum retro_pixel_format preferred);
 
 /* Sets device to be used for player 'port'.
  * By default, RETRO_DEVICE_JOYPAD is assumed to be plugged into all 
