@@ -1807,9 +1807,6 @@ typedef void (*retro_video_refresh_t)(const void *data, unsigned width,
 typedef size_t (*retro_audio_push_t)(const int16_t *data,
       size_t frames);
 
-/* Polls input. */
-typedef void (*retro_input_poll_t)(void);
-
 /* Queries for input for player 'port'. device will be masked with 
  * RETRO_DEVICE_MASK.
  *
@@ -1828,7 +1825,6 @@ typedef int16_t (*retro_input_state_t)(unsigned port, unsigned device,
 void retro_set_environment(retro_environment_t);
 void retro_set_video_refresh(retro_video_refresh_t);
 void retro_set_audio_push(retro_audio_push_t);
-void retro_set_input_poll(retro_input_poll_t);
 void retro_set_input_state(retro_input_state_t);
 
 /* Library global initialization/deinitialization. */
