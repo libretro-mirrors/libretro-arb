@@ -1932,9 +1932,6 @@ size_t retro_serialize_size(void);
 bool retro_serialize(void *data, size_t size);
 bool retro_unserialize(const void *data, size_t size);
 
-void retro_cheat_reset(void);
-void retro_cheat_set(unsigned index, bool enabled, const char *code);
-
 /* Loads a game. */
 bool retro_load_game(const struct retro_game_info *game);
 
