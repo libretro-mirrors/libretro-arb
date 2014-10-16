@@ -1799,19 +1799,12 @@ typedef bool (*retro_environment_t)(unsigned cmd, void *data);
 typedef void (*retro_video_refresh_t)(const void *data, unsigned width,
       unsigned height, size_t pitch);
 
-/* Renders a single audio frame. Should only be used if implementation 
- * generates a single sample at a time.
- * Format is signed 16-bit native endian.
- */
-typedef void (*retro_audio_sample_t)(int16_t left, int16_t right);
-
-/* Renders multiple audio frames in one go.
+/* Renders a chunk of audio.
  *
  * One frame is defined as a sample of left and right channels, interleaved.
  * I.e. int16_t buf[4] = { l, r, l, r }; would be 2 frames.
- * Only one of the audio callbacks must ever be used.
  */
-typedef size_t (*retro_audio_sample_batch_t)(const int16_t *data,
+typedef size_t (*retro_audio_push_t)(const int16_t *data,
       size_t frames);
 
 /* Polls input. */
@@ -1834,8 +1827,7 @@ typedef int16_t (*retro_input_state_t)(unsigned port, unsigned device,
  * before the first call to retro_run() is made. */
 void retro_set_environment(retro_environment_t);
 void retro_set_video_refresh(retro_video_refresh_t);
-void retro_set_audio_sample(retro_audio_sample_t);
-void retro_set_audio_sample_batch(retro_audio_sample_batch_t);
+void retro_set_audio_push(retro_audio_push_t);
 void retro_set_input_poll(retro_input_poll_t);
 void retro_set_input_state(retro_input_state_t);
 
