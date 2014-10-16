@@ -514,54 +514,21 @@ enum retro_mod
                                             * If HW rendering is used, pass only RETRO_HW_FRAME_BUFFER_VALID or 
                                             * NULL to retro_video_refresh_t.
                                             */
-#define RETRO_ENVIRONMENT_GET_VARIABLE 15
-                                           /* struct retro_variable * --
+#define RETRO_ENVIRONMENT_SET_VARIABLES 15
+                                           /* const struct retro_variable * --
                                             * Interface to acquire user-defined information from environment
                                             * that cannot feasibly be supported in a multi-system way.
-                                            * 'key' should be set to a key which has already been set by 
-                                            * SET_VARIABLES.
-                                            * 'data' will be set to a value or NULL.
+                                            * 
+                                            * The first call must be from retro_set_environment or retro_init.
+                                            * Additionally, the core may call RETRO_ENVIRONMENT_SET_VARIABLES
+                                            * again during retro_load_game, retro_run, and retro_variable::
+                                            * ::change_notify, and may have changed some of the entries.
+                                            * However, each 'name', 'values' and 'initial' must be the same
+                                            * as for the initial call.
                                             */
-#define RETRO_ENVIRONMENT_SET_VARIABLES 16
-                                           /* const struct retro_variable * --
-                                            * Allows an implementation to signal the environment
-                                            * which variables it might want to check for later using 
-                                            * GET_VARIABLE.
-                                            * This allows the frontend to present these variables to 
-                                            * a user dynamically.
-                                            * This should be called as early as possible (ideally in 
-                                            * retro_set_environment).
-                                            *
-                                            * 'data' points to an array of retro_variable structs 
-                                            * terminated by a { NULL, NULL } element.
-                                            * retro_variable::key should be namespaced to not collide 
-                                            * with other implementations' keys. E.g. A core called 
-                                            * 'foo' should use keys named as 'foo_option'.
-                                            * retro_variable::value should contain a human readable 
-                                            * description of the key as well as a '|' delimited list 
-                                            * of expected values.
-                                            *
-                                            * The number of possible options should be very limited, 
-                                            * i.e. it should be feasible to cycle through options 
-                                            * without a keyboard.
-                                            *
-                                            * First entry should be treated as a default.
-                                            *
-                                            * Example entry:
-                                            * { "foo_option", "Speed hack coprocessor X; false|true" }
-                                            *
-                                            * Text before first ';' is description. This ';' must be 
-                                            * followed by a space, and followed by a list of possible 
-                                            * values split up with '|'.
-                                            *
-                                            * Only strings are operated on. The possible values will 
-                                            * generally be displayed and stored as-is by the frontend.
-                                            */
-#define RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE 17
-                                           /* bool * --
-                                            * Result is set to true if some variables are updated by
-                                            * frontend since last call to RETRO_ENVIRONMENT_GET_VARIABLE.
-                                            * Variables should be queried with GET_VARIABLE.
+#define RETRO_ENVIRONMENT_GET_VARIABLE 16
+                                           /* struct retro_variable_query * --
+                                            * Asks the frontend what value a variable has.
                                             */
 #define RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME 18
                                            /* const bool * --
@@ -1743,19 +1710,101 @@ struct retro_system_av_info
    struct retro_system_timing timing;
 };
 
+
+
+enum retro_variable_type
+{
+   /* Tells that the variable list has ended. */
+   RETRO_VARIABLE_TYPE_TERMINATOR,
+
+   /* A separator in the list. Use to group similar items together.
+    * All other members are ignored for items of this type. */
+   RETRO_VARIABLE_TYPE_SEPARATOR,
+
+   /* Enumeration. 'values' is const char * const *, with one entry
+    * for each item; terminated by a NULL. 'initial' is a const unsigned int *
+    * containing the index of the default value. */
+   RETRO_VARIABLE_TYPE_ENUM,
+
+   /* Boolean. 'values' is NULL and 'initial' is bool*. */
+   RETRO_VARIABLE_TYPE_BOOL,
+
+   /* Integer. 'values' is const int * containing two entries: the lowest and
+    * highest valid values, inclusive. 'initial' is also a const int *. */
+   RETRO_VARIABLE_TYPE_INT,
+   
+   /* Floating point. Same as RETRO_VARIABLE_INT, except with 'float'
+    * instead of 'int'.
+    * The frontend is responsible for calculating a reasonable step size. */
+   RETRO_VARIABLE_TYPE_FLOAT,
+   
+   RETRO_VARIABLE_TYPE_DUMMY = INT_MAX
+};
+
+enum retro_variable_change
+{
+   /* Changes take effect at the next retro_run, or possibly takes a few frames
+    * (<= 0.1 seconds, otherwise DELAYED should be used). */
+   RETRO_VARIABLE_CHANGE_INSTANT,
+
+   /* Changes take effect during retro_run, but not instantly; for example,
+    * it may be delayed until the next level is loaded. */
+   RETRO_VARIABLE_CHANGE_DELAYED,
+
+   /* Only used during retro_load_game, or possibly retro_reset. */
+   RETRO_VARIABLE_CHANGE_RESET,
+
+   /* This variable is currently ignored; it is only usable if other options are
+    * changed first. If they are, RETRO_ENVIRONMENT_SET_VARIABLES must be called
+    * again. */
+   RETRO_VARIABLE_CHANGE_WRONG_OPTS,
+
+   /* This variable is not applicable for this game. */
+   RETRO_VARIABLE_CHANGE_WRONG_GAME,
+
+   RETRO_VARIABLE_CHANGE_DUMMY = INT_MAX
+};
+
 struct retro_variable
 {
-   /* Variable to query in RETRO_ENVIRONMENT_GET_VARIABLE.
-    * If NULL, obtains the complete environment string if more 
-    * complex parsing is necessary.
-    * The environment string is formatted as key-value pairs 
-    * delimited by semicolons as so:
-    * "key1=value1;key2=value2;..."
-    */
-   const char *key;
-   
-   /* Value to be obtained. If key does not exist, it is set to NULL. */
-   const char *value;
+   /* Variable type. See above. */
+   enum retro_variable_type type;
+   /* When the implementation will acknowledge changes to this variable.
+    * Note that the front is allowed to change variables marked
+    * currently unusable. */
+   enum retro_variable_change change;
+
+   /* Variable name, to be used internally. Suitable for
+    * saving to configuration files. Example: gb_colorize */
+   const char *name;
+   /* Variable name, to show the user. Suitable for GUIs.
+    * Example: Game Boy colorization */
+   const char *pub_name;
+   /* Variable description. Suitable as a second line in GUIs.
+    * Example: Emulate fake colors on black&white games. */
+   const char *description;
+   /* Possible values. See enum retro_variable_type for what type it has.
+    * Example: { "Enabled", "Disabled", NULL }
+    * (though that one should be a BOOL instead). */
+   void *values;
+   /* Default value. Example: 1 */
+   void *initial;
+
+   /* Called by the frontend every time this variable changes, or NULL to ignore.
+    * Can be different for different variables.
+    * ID is the index to the array given to RETRO_ENVIRONMENT_SET_VARIABLES.
+    * Separators have IDs, but their value must not be set or queried.
+    * 'value' has the same type as 'default'.
+    * Can be called during RETRO_ENVIRONMENT_SET_VARIABLES. */
+   void (*change_notify)(unsigned int id, void *value);
+};
+
+struct retro_variable_query
+{
+   /* Same ID as in change_notify. Core sets this before calling GET_VARIABLE. */
+   unsigned int id;
+   /* Same type as initial and change_notify. Front sets this. */
+   void *value;
 };
 
 struct retro_game_info
