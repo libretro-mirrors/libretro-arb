@@ -410,23 +410,22 @@ enum retro_mod
 #define RETRO_ENVIRONMENT_PRIVATE 0x20000
 
 /* Environment commands. */
-#define RETRO_ENVIRONMENT_SET_ROTATION  1  /* const unsigned * --
+/* #define RETRO_ENVIRONMENT_SET_ROTATION     Removed due to lack of justification for why it can't go through SET_HW_RENDER.
+                                            * const unsigned * --
                                             * Sets screen rotation of graphics.
                                             * Is only implemented if rotation can be accelerated by hardware.
                                             * Valid values are 0, 1, 2, 3, which rotates screen by 0, 90, 180, 
                                             * 270 degrees counter-clockwise respectively.
                                             */
-#define RETRO_ENVIRONMENT_GET_OVERSCAN  2  /* bool * --
+/* #define RETRO_ENVIRONMENT_GET_OVERSCAN     Removed due to lack of justifcation for why it can not be a core option.
+                                            * bool * --
                                             * Boolean value whether or not the implementation should use overscan, 
                                             * or crop away overscan.
                                             */
-#define RETRO_ENVIRONMENT_GET_CAN_DUPE  3  /* bool * --
+/* #define RETRO_ENVIRONMENT_GET_CAN_DUPE     Now mandatory.
+                                            * bool * --
                                             * Boolean value whether or not frontend supports frame duping,
                                             * passing NULL to video frame callback.
-                                            */
-
-                                           /* Environ 4, 5 are no longer supported (GET_VARIABLE / SET_VARIABLES), 
-                                            * and reserved to avoid possible ABI clash.
                                             */
 
 #define RETRO_ENVIRONMENT_SET_MESSAGE   6  /* const struct retro_message * --
