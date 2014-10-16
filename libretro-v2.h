@@ -530,8 +530,8 @@ enum retro_mod
                                            /* struct retro_variable_query * --
                                             * Asks the frontend what value a variable has.
                                             */
-#define RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME 18
-                                           /* const bool * --
+/* #define RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME Now indicated by setting retro_system_info::valid_extensions to NULL.
+                                            * const bool * --
                                             * If true, the libretro implementation supports calls to 
                                             * retro_load_game() with NULL as argument.
                                             * Used by cores which can run without particular game data.
@@ -716,8 +716,8 @@ enum retro_mod
                                             * If this returns false, the frontend does not acknowledge a 
                                             * changed av_info struct.
                                             */
-#define RETRO_ENVIRONMENT_SET_PROC_ADDRESS_CALLBACK 33
-                                           /* const struct retro_get_proc_address_interface * --
+/* #define RETRO_ENVIRONMENT_SET_PROC_ADDRESS_CALLBACK Now a function (retro_request).
+                                            * const struct retro_get_proc_address_interface * --
                                             * Allows a libretro core to announce support for the 
                                             * get_proc_address() interface.
                                             * This interface allows for a standard way to extend libretro where 
@@ -1028,29 +1028,6 @@ struct retro_subsystem_info
    
    /* The type passed to retro_load_game_special(). */
    unsigned id;
-};
-
-typedef void (*retro_proc_address_t)(void);
-
-/* libretro API extension functions:
- * (None here so far).
- *
- * Get a symbol from a libretro core.
- * Cores should only return symbols which are actual 
- * extensions to the libretro API.
- *
- * Frontends should not use this to obtain symbols to standard 
- * libretro entry points (static linking or dlsym).
- *
- * The symbol name must be equal to the function name, 
- * e.g. if void retro_foo(void); exists, the symbol must be called "retro_foo".
- * The returned function pointer must be cast to the corresponding type.
- */
-typedef retro_proc_address_t (*retro_get_proc_address_t)(const char *sym);
-
-struct retro_get_proc_address_interface
-{
-   retro_get_proc_address_t get_proc_address;
 };
 
 enum retro_log_level
@@ -1395,6 +1372,8 @@ struct retro_frame_time_callback
  * */
 #define RETRO_HW_FRAME_BUFFER_VALID ((void*)-1)
 
+typedef retro_proc_address_t (*retro_get_proc_address_t)(const char *sym);
+
 /* Invalidates the current HW context.
  * Any GL state is lost, and must not be deinitialized explicitly.
  * If explicit deinitialization is desired by the libretro core,
@@ -1412,6 +1391,7 @@ typedef void (*retro_hw_context_reset_t)(void);
 typedef uintptr_t (*retro_hw_get_current_framebuffer_t)(void);
 
 /* Get a symbol from HW context. */
+typedef void (*retro_proc_address_t)(void);
 typedef retro_proc_address_t (*retro_hw_get_proc_address_t)(const char *sym);
 
 enum retro_hw_context_type
@@ -1868,6 +1848,10 @@ void retro_set_environment(retro_environment_t);
 void retro_set_video_refresh(retro_video_refresh_t);
 void retro_set_audio_push(retro_audio_push_t);
 void retro_set_input_state(retro_input_state_t);
+
+/* This acts like reverse environment callbacks, allowing the core to export
+ * more functions without changing ABI. */
+bool retro_request(unsigned cmd, void *data);
 
 /* Library global initialization/deinitialization. */
 bool retro_init(void);
