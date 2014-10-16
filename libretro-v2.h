@@ -417,6 +417,13 @@ enum retro_mod
                                             * logged via RETRO_ENVIRONMENT_GET_LOG_INTERFACE (or as a 
                                             * fallback, stderr).
                                             */
+struct retro_message
+{
+   const char *msg;        /* Message to be displayed. */
+   unsigned    frames;     /* Duration in frames of message. */
+};
+
+
 #define RETRO_ENVIRONMENT_SHUTDOWN      7  /* N/A (NULL) --
                                             * Requests the frontend to shutdown.
                                             * Should only be used if game has a specific
@@ -462,10 +469,54 @@ enum retro_mod
                                             * This function can be called at any time, but it is recommended 
                                             * to call it as early as possible.
                                             */
+/* Describes how the libretro implementation maps a libretro input bind
+ * to its internal input system through a human readable string.
+ * This string can be used to better let a user configure input. */
+struct retro_input_descriptor
+{
+   /* Associates given parameters with a description. */
+   unsigned port;
+   unsigned device;
+   unsigned index;
+   unsigned id;
+
+   /* Human readable description for parameters.
+    * The pointer must remain valid until
+    * retro_unload_game() is called. */
+   const char *description; 
+};
+
+
 #define RETRO_ENVIRONMENT_SET_KEYBOARD_CALLBACK 12
                                            /* const struct retro_keyboard_callback * --
                                             * Sets a callback function used to notify core about keyboard events.
                                             */
+/* Callback type passed in RETRO_ENVIRONMENT_SET_KEYBOARD_CALLBACK. 
+ * Called by the frontend in response to keyboard events.
+ * down is set if the key is being pressed, or false if it is being released.
+ * keycode is the RETROK value of the char.
+ * character is the text character of the pressed key. (UTF-32).
+ * key_modifiers is a set of RETROKMOD values or'ed together.
+ *
+ * The pressed/keycode state can be indepedent of the character.
+ * It is also possible that multiple characters are generated from a 
+ * single keypress.
+ * Keycode events should be treated separately from character events.
+ * However, when possible, the frontend should try to synchronize these.
+ * If only a character is posted, keycode should be RETROK_UNKNOWN.
+ *
+ * Similarily if only a keycode event is generated with no corresponding 
+ * character, character should be 0.
+ */
+typedef void (*retro_keyboard_event_t)(bool down, unsigned keycode, 
+      uint32_t character, uint16_t key_modifiers);
+
+struct retro_keyboard_callback
+{
+   retro_keyboard_event_t callback;
+};
+
+
 #define RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE 13
                                            /* const struct retro_disk_control_callback * --
                                             * Sets an interface which frontend can use to eject and insert 
@@ -473,6 +524,78 @@ enum retro_mod
                                             * This is used for games which consist of multiple images and 
                                             * must be manually swapped out by the user (e.g. PSX).
                                             */
+/* Callbacks for RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE.
+ * Should be set for implementations which can swap out multiple disk 
+ * images in runtime.
+ *
+ * If the implementation can do this automatically, it should strive to do so.
+ * However, there are cases where the user must manually do so.
+ *
+ * Overview: To swap a disk image, eject the disk image with 
+ * set_eject_state(true).
+ * Set the disk index with set_image_index(index). Insert the disk again 
+ * with set_eject_state(false).
+ */
+
+/* If ejected is true, "ejects" the virtual disk tray.
+ * When ejected, the disk image index can be set.
+ */
+typedef bool (*retro_set_eject_state_t)(bool ejected);
+
+/* Gets current eject state. The initial state is 'not ejected'. */
+typedef bool (*retro_get_eject_state_t)(void);
+
+/* Gets current disk index. First disk is index 0.
+ * If return value is >= get_num_images(), no disk is currently inserted.
+ */
+typedef unsigned (*retro_get_image_index_t)(void);
+
+/* Sets image index. Can only be called when disk is ejected.
+ * The implementation supports setting "no disk" by using an 
+ * index >= get_num_images().
+ */
+typedef bool (*retro_set_image_index_t)(unsigned index);
+
+/* Gets total number of images which are available to use. */
+typedef unsigned (*retro_get_num_images_t)(void);
+
+struct retro_game_info;
+
+/* Replaces the disk image associated with index.
+ * Arguments to pass in info have same requirements as retro_load_game().
+ * Virtual disk tray must be ejected when calling this.
+ *
+ * Replacing a disk image with info = NULL will remove the disk image 
+ * from the internal list.
+ * As a result, calls to get_image_index() can change.
+ *
+ * E.g. replace_image_index(1, NULL), and previous get_image_index() 
+ * returned 4 before.
+ * Index 1 will be removed, and the new index is 3.
+ */
+typedef bool (*retro_replace_image_index_t)(unsigned index,
+      const struct retro_game_info *info);
+
+/* Adds a new valid index (get_num_images()) to the internal disk list.
+ * This will increment subsequent return values from get_num_images() by 1.
+ * This image index cannot be used until a disk image has been set 
+ * with replace_image_index. */
+typedef bool (*retro_add_image_index_t)(void);
+
+struct retro_disk_control_callback
+{
+   retro_set_eject_state_t set_eject_state;
+   retro_get_eject_state_t get_eject_state;
+
+   retro_get_image_index_t get_image_index;
+   retro_set_image_index_t set_image_index;
+   retro_get_num_images_t  get_num_images;
+
+   retro_replace_image_index_t replace_image_index;
+   retro_add_image_index_t add_image_index;
+};
+
+
 #define RETRO_ENVIRONMENT_SET_HW_RENDER 14
                                            /* struct retro_hw_render_callback * --
                                             * Sets an interface to let a libretro core render with 
@@ -485,6 +608,128 @@ enum retro_mod
                                             * If HW rendering is used, pass only RETRO_HW_FRAME_BUFFER_VALID or 
                                             * NULL to retro_video_refresh_t.
                                             */
+/* Pass this to retro_video_refresh_t if rendering to hardware.
+ * Passing NULL to retro_video_refresh_t is still a frame dupe as normal.
+ * */
+#define RETRO_HW_FRAME_BUFFER_VALID ((void*)-1)
+/* Invalidates the current HW context.
+ * Any GL state is lost, and must not be deinitialized explicitly.
+ * If explicit deinitialization is desired by the libretro core,
+ * it should implement context_destroy callback.
+ * If called, all GPU resources must be reinitialized.
+ * Usually called when frontend reinits video driver.
+ * Also called first time video driver is initialized, 
+ * allowing libretro core to initialize resources.
+ */
+typedef void (*retro_hw_context_reset_t)(void);
+
+/* Gets current framebuffer which is to be rendered to.
+ * Could change every frame potentially.
+ */
+typedef uintptr_t (*retro_hw_get_current_framebuffer_t)(void);
+
+/* Get a symbol from HW context. */
+typedef void (*retro_proc_address_t)(void);
+typedef retro_proc_address_t (*retro_hw_get_proc_address_t)(const char *sym);
+
+enum retro_hw_context_type
+{
+   RETRO_HW_CONTEXT_NONE             = 0,
+   /* OpenGL 2.x. Driver can choose to use latest compatibility context. */
+   RETRO_HW_CONTEXT_OPENGL           = 1, 
+   /* OpenGL ES 2.0. */
+   RETRO_HW_CONTEXT_OPENGLES2        = 2,
+   /* Modern desktop core GL context. Use version_major/
+    * version_minor fields to set GL version. */
+   RETRO_HW_CONTEXT_OPENGL_CORE      = 3,
+   /* OpenGL ES 3.0 */
+   RETRO_HW_CONTEXT_OPENGLES3        = 4,
+   /* OpenGL ES 3.1+. Set version_major/version_minor. For GLES2 and GLES3,
+    * use the corresponding enums directly. */
+   RETRO_HW_CONTEXT_OPENGLES_VERSION = 5,
+
+   RETRO_HW_CONTEXT_DUMMY = INT_MAX
+};
+
+struct retro_hw_render_callback
+{
+   /* Which API to use. Set by libretro core. */
+   enum retro_hw_context_type context_type;
+
+   /* Called when a context has been created or when it has been reset.
+    * An OpenGL context is only valid after context_reset() has been called.
+    *
+    * When context_reset is called, OpenGL resources in the libretro 
+    * implementation are guaranteed to be invalid.
+    *
+    * It is possible that context_reset is called multiple times during an 
+    * application lifecycle.
+    * If context_reset is called without any notification (context_destroy),
+    * the OpenGL context was lost and resources should just be recreated
+    * without any attempt to "free" old resources.
+    */
+   retro_hw_context_reset_t context_reset;
+
+   /* Set by frontend. */
+   retro_hw_get_current_framebuffer_t get_current_framebuffer;
+
+   /* Set by frontend. */
+   retro_hw_get_proc_address_t get_proc_address;
+
+   /* Set if render buffers should have depth component attached. */
+   bool depth;
+
+   /* Set if stencil buffers should be attached. */
+   bool stencil;
+
+   /* If depth and stencil are true, a packed 24/8 buffer will be added. 
+    * Only attaching stencil is invalid and will be ignored. */
+
+   /* Use conventional bottom-left origin convention. If false, 
+    * standard libretro top-left origin semantics are used. */
+   bool bottom_left_origin;
+   
+   /* Major version number for core GL context or GLES 3.1+. */
+   unsigned version_major;
+
+   /* Minor version number for core GL context or GLES 3.1+. */
+   unsigned version_minor;
+
+   /* If this is true, the frontend will go very far to avoid 
+    * resetting context in scenarios like toggling fullscreen, etc.
+    */
+   bool cache_context;
+
+   /* The reset callback might still be called in extreme situations 
+    * such as if the context is lost beyond recovery.
+    *
+    * For optimal stability, set this to false, and allow context to be 
+    * reset at any time.
+    */
+   
+   /* A callback to be called before the context is destroyed in a 
+    * controlled way by the frontend. */
+   retro_hw_context_reset_t context_destroy;
+
+   /* OpenGL resources can be deinitialized cleanly at this step.
+    * context_destroy can be set to NULL, in which resources will 
+    * just be destroyed without any notification.
+    *
+    * Even when context_destroy is non-NULL, it is possible that 
+    * context_reset is called without any destroy notification.
+    * This happens if context is lost by external factors (such as 
+    * notified by GL_ARB_robustness).
+    *
+    * In this case, the context is assumed to be already dead,
+    * and the libretro implementation must not try to free any OpenGL 
+    * resources in the subsequent context_reset.
+    */
+
+   /* Creates a debug context. */
+   bool debug_context;
+};
+
+
 #define RETRO_ENVIRONMENT_SET_VARIABLES 15
                                            /* const struct retro_variable * --
                                             * Interface to acquire user-defined information from environment
@@ -501,6 +746,102 @@ enum retro_mod
                                            /* struct retro_variable_query * --
                                             * Asks the frontend what value a variable has.
                                             */
+enum retro_variable_type
+{
+   /* Tells that the variable list has ended. */
+   RETRO_VARIABLE_TYPE_TERMINATOR,
+
+   /* A separator in the list. Use to group similar items together.
+    * All other members are ignored for items of this type. */
+   RETRO_VARIABLE_TYPE_SEPARATOR,
+
+   /* Enumeration. 'values' is const char * const *, with one entry
+    * for each item; terminated by a NULL. 'initial' is a const unsigned int *
+    * containing the index of the default value. */
+   RETRO_VARIABLE_TYPE_ENUM,
+
+   /* Boolean. 'values' is NULL and 'initial' is bool*. */
+   RETRO_VARIABLE_TYPE_BOOL,
+
+   /* Integer. 'values' is const int * containing two entries: the lowest and
+    * highest valid values, inclusive. 'initial' is also a const int *. */
+   RETRO_VARIABLE_TYPE_INT,
+   
+   /* Floating point. Same as RETRO_VARIABLE_INT, except with 'float'
+    * instead of 'int'.
+    * The frontend is responsible for calculating a reasonable step size. */
+   RETRO_VARIABLE_TYPE_FLOAT,
+   
+   RETRO_VARIABLE_TYPE_DUMMY = INT_MAX
+};
+
+enum retro_variable_change
+{
+   /* Changes take effect at the next retro_run, or possibly takes a few frames
+    * (<= 0.1 seconds, otherwise DELAYED should be used). */
+   RETRO_VARIABLE_CHANGE_INSTANT,
+
+   /* Changes take effect during retro_run, but not instantly; for example,
+    * it may be delayed until the next level is loaded. */
+   RETRO_VARIABLE_CHANGE_DELAYED,
+
+   /* Only used during retro_load_game, or possibly retro_reset. */
+   RETRO_VARIABLE_CHANGE_RESET,
+
+   /* This variable is currently ignored; it is only usable if other options are
+    * changed first. If they are, RETRO_ENVIRONMENT_SET_VARIABLES must be called
+    * again. */
+   RETRO_VARIABLE_CHANGE_WRONG_OPTS,
+
+   /* This variable is not applicable for this game. */
+   RETRO_VARIABLE_CHANGE_WRONG_GAME,
+
+   RETRO_VARIABLE_CHANGE_DUMMY = INT_MAX
+};
+
+struct retro_variable
+{
+   /* Variable type. See above. */
+   enum retro_variable_type type;
+   /* When the implementation will acknowledge changes to this variable.
+    * Note that the front is allowed to change variables marked
+    * currently unusable. */
+   enum retro_variable_change change;
+
+   /* Variable name, to be used internally. Suitable for
+    * saving to configuration files. Example: gb_colorize */
+   const char *name;
+   /* Variable name, to show the user. Suitable for GUIs.
+    * Example: Game Boy colorization */
+   const char *pub_name;
+   /* Variable description. Suitable as a second line in GUIs.
+    * Example: Emulate fake colors on black&white games. */
+   const char *description;
+   /* Possible values. See enum retro_variable_type for what type it has.
+    * Example: { "Enabled", "Disabled", NULL }
+    * (though that one should be a BOOL instead). */
+   void *values;
+   /* Default value. Example: 1 */
+   void *initial;
+
+   /* Called by the frontend every time this variable changes, or NULL to ignore.
+    * Can be different for different variables.
+    * ID is the index to the array given to RETRO_ENVIRONMENT_SET_VARIABLES.
+    * Separators have IDs, but their value must not be set or queried.
+    * 'value' has the same type as 'default'.
+    * Can be called during RETRO_ENVIRONMENT_SET_VARIABLES. */
+   void (*change_notify)(unsigned int id, void *value);
+};
+
+struct retro_variable_query
+{
+   /* Same ID as in change_notify. Core sets this before calling GET_VARIABLE. */
+   unsigned int id;
+   /* Same type as initial and change_notify. Front sets this. */
+   void *value;
+};
+
+
 #define RETRO_ENVIRONMENT_GET_LIBRETRO_PATH 19
                                            /* const char ** --
                                             * Retrieves the absolute path from where this libretro 
@@ -541,6 +882,25 @@ enum retro_mod
                                             * A libretro core using SET_AUDIO_CALLBACK should also make use of 
                                             * SET_FRAME_TIME_CALLBACK.
                                             */
+/* Notifies libretro that audio data should be written. */
+typedef void (*retro_audio_callback_t)(void);
+
+/* True: Audio driver in frontend is active, and callback is 
+ * expected to be called regularily.
+ * False: Audio driver in frontend is paused or inactive. 
+ * Audio callback will not be called until set_state has been 
+ * called with true.
+ * Initial state is false (inactive).
+ */
+typedef void (*retro_audio_set_state_callback_t)(bool enabled);
+
+struct retro_audio_callback
+{
+   retro_audio_callback_t callback;
+   retro_audio_set_state_callback_t set_state;
+};
+
+
 #define RETRO_ENVIRONMENT_SET_FRAME_TIME_CALLBACK 21
                                            /* const struct retro_frame_time_callback * --
                                             * Lets the core know how much time has passed since last 
@@ -550,6 +910,26 @@ enum retro_mod
                                             * In this case the delta time will use the reference value 
                                             * in frame_time_callback..
                                             */
+/* Notifies a libretro core of time spent since last invocation 
+ * of retro_run() in microseconds.
+ *
+ * It will be called right before retro_run() every frame.
+ * The frontend can tamper with timing to support cases like 
+ * fast-forward, slow-motion and framestepping.
+ *
+ * In those scenarios the reference frame time value will be used. */
+typedef int64_t retro_usec_t;
+typedef void (*retro_frame_time_callback_t)(retro_usec_t usec);
+struct retro_frame_time_callback
+{
+   retro_frame_time_callback_t callback;
+   /* Represents the time of one frame. It is computed as 
+    * 1000000 / fps, but the implementation will resolve the 
+    * rounding to ensure that framestepping, etc is exact. */
+   retro_usec_t reference;
+};
+
+
 #define RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE 23
                                            /* struct retro_rumble_interface * --
                                             * Gets an interface which is used by a libretro core to set 
@@ -557,6 +937,30 @@ enum retro_mod
                                             * A strong and weak motor is supported, and they can be 
                                             * controlled indepedently.
                                             */
+enum retro_rumble_effect
+{
+   RETRO_RUMBLE_STRONG = 0,
+   RETRO_RUMBLE_WEAK = 1,
+
+   RETRO_RUMBLE_DUMMY = INT_MAX
+};
+
+/* Sets rumble state for joypad plugged in port 'port'. 
+ * Rumble effects are controlled independently,
+ * and setting e.g. strong rumble does not override weak rumble.
+ * Strength has a range of [0, 0xffff].
+ *
+ * Returns true if rumble state request was honored. 
+ * Calling this before first retro_run() is likely to return false. */
+typedef bool (*retro_set_rumble_state_t)(unsigned port, 
+      enum retro_rumble_effect effect, uint16_t strength);
+
+struct retro_rumble_interface
+{
+   retro_set_rumble_state_t set_rumble_state;
+};
+
+
 #define RETRO_ENVIRONMENT_GET_INPUT_DEVICE_CAPABILITIES 24
                                            /* uint64_t * --
                                             * Gets a bitmask telling which device type are expected to be 
@@ -575,6 +979,34 @@ enum retro_mod
                                             * Reading sensor state is done via the normal 
                                             * input_state_callback API.
                                             */
+/* FIXME: Document the sensor API and work out behavior.
+ * It will be marked as experimental until then.
+ */
+enum retro_sensor_action
+{
+   RETRO_SENSOR_ACCELEROMETER_ENABLE = 0,
+   RETRO_SENSOR_ACCELEROMETER_DISABLE,
+
+   RETRO_SENSOR_DUMMY = INT_MAX
+};
+
+/* Id values for SENSOR types. */
+#define RETRO_SENSOR_ACCELEROMETER_X 0
+#define RETRO_SENSOR_ACCELEROMETER_Y 1
+#define RETRO_SENSOR_ACCELEROMETER_Z 2
+
+typedef bool (*retro_set_sensor_state_t)(unsigned port, 
+      enum retro_sensor_action action, unsigned rate);
+
+typedef float (*retro_sensor_get_input_t)(unsigned port, unsigned id);
+
+struct retro_sensor_interface
+{
+   retro_set_sensor_state_t set_sensor_state;
+   retro_sensor_get_input_t get_sensor_input;
+};
+
+
 #define RETRO_ENVIRONMENT_GET_CAMERA_INTERFACE (26 | RETRO_ENVIRONMENT_EXPERIMENTAL)
                                            /* struct retro_camera_callback * --
                                             * Gets an interface to a video camera driver.
@@ -600,6 +1032,85 @@ enum retro_mod
                                             * functions must be used to explicitly
                                             * start and stop the camera driver.
                                             */
+enum retro_camera_buffer
+{
+   RETRO_CAMERA_BUFFER_OPENGL_TEXTURE = 0,
+   RETRO_CAMERA_BUFFER_RAW_FRAMEBUFFER,
+
+   RETRO_CAMERA_BUFFER_DUMMY = INT_MAX
+};
+
+/* Starts the camera driver. Can only be called in retro_run(). */
+typedef bool (*retro_camera_start_t)(void);
+
+/* Stops the camera driver. Can only be called in retro_run(). */
+typedef void (*retro_camera_stop_t)(void);
+
+/* Callback which signals when the camera driver is initialized 
+ * and/or deinitialized.
+ * retro_camera_start_t can be called in initialized callback.
+ */
+typedef void (*retro_camera_lifetime_status_t)(void);
+
+/* A callback for raw framebuffer data. buffer points to an XRGB8888 buffer.
+ * Width, height and pitch are similar to retro_video_refresh_t.
+ * First pixel is top-left origin.
+ */
+typedef void (*retro_camera_frame_raw_framebuffer_t)(const uint32_t *buffer, 
+      unsigned width, unsigned height, size_t pitch);
+
+/* A callback for when OpenGL textures are used.
+ *
+ * texture_id is a texture owned by camera driver.
+ * Its state or content should be considered immutable, except for things like 
+ * texture filtering and clamping.
+ *
+ * texture_target is the texture target for the GL texture.
+ * These can include e.g. GL_TEXTURE_2D, GL_TEXTURE_RECTANGLE, and possibly 
+ * more depending on extensions.
+ *
+ * affine points to a packed 3x3 column-major matrix used to apply an affine 
+ * transform to texture coordinates. (affine_matrix * vec3(coord_x, coord_y, 1.0))
+ * After transform, normalized texture coord (0, 0) should be bottom-left 
+ * and (1, 1) should be top-right (or (width, height) for RECTANGLE).
+ *
+ * GL-specific typedefs are avoided here to avoid relying on gl.h in 
+ * the API definition.
+ */
+typedef void (*retro_camera_frame_opengl_texture_t)(unsigned texture_id, 
+      unsigned texture_target, const float *affine);
+
+struct retro_camera_callback
+{
+   /* Set by libretro core. 
+    * Example bitmask: caps = (1 << RETRO_CAMERA_BUFFER_OPENGL_TEXTURE) | (1 << RETRO_CAMERA_BUFFER_RAW_FRAMEBUFFER).
+    */
+   uint64_t caps; 
+
+   unsigned width; /* Desired resolution for camera. Is only used as a hint. */
+   unsigned height;
+   retro_camera_start_t start; /* Set by frontend. */
+   retro_camera_stop_t stop; /* Set by frontend. */
+
+   /* Set by libretro core if raw framebuffer callbacks will be used. */
+   retro_camera_frame_raw_framebuffer_t frame_raw_framebuffer;
+   /* Set by libretro core if OpenGL texture callbacks will be used. */
+   retro_camera_frame_opengl_texture_t frame_opengl_texture; 
+
+   /* Set by libretro core. Called after camera driver is initialized and 
+    * ready to be started.
+    * Can be NULL, in which this callback is not called.
+    */
+   retro_camera_lifetime_status_t initialized;
+
+   /* Set by libretro core. Called right before camera driver is 
+    * deinitialized.
+    * Can be NULL, in which this callback is not called.
+    */
+   retro_camera_lifetime_status_t deinitialized;
+};
+
+
 #define RETRO_ENVIRONMENT_GET_LOG_INTERFACE 27
                                            /* struct retro_log_callback * --
                                             * Gets an interface for logging. This is useful for 
@@ -610,12 +1121,143 @@ enum retro_mod
                                             * If this interface is not used, libretro cores should 
                                             * log to stderr as desired.
                                             */
+enum retro_log_level
+{
+   RETRO_LOG_DEBUG = 0,
+   RETRO_LOG_INFO,
+   RETRO_LOG_WARN,
+   RETRO_LOG_ERROR,
+
+   RETRO_LOG_DUMMY = INT_MAX
+};
+
+/* Logging function. Takes log level argument as well. */
+typedef void (*retro_log_printf_t)(enum retro_log_level level,
+      const char *fmt, ...);
+
+struct retro_log_callback
+{
+   retro_log_printf_t log;
+};
+
+
 #define RETRO_ENVIRONMENT_GET_PERF_INTERFACE 28
                                            /* struct retro_perf_callback * --
                                             * Gets an interface for performance counters. This is useful 
                                             * for performance logging in a cross-platform way and for detecting 
                                             * architecture-specific features, such as SIMD support.
                                             */
+/* Performance related functions */
+
+/* ID values for SIMD CPU features */
+#define RETRO_SIMD_SSE      (1 << 0)
+#define RETRO_SIMD_SSE2     (1 << 1)
+#define RETRO_SIMD_VMX      (1 << 2)
+#define RETRO_SIMD_VMX128   (1 << 3)
+#define RETRO_SIMD_AVX      (1 << 4)
+#define RETRO_SIMD_NEON     (1 << 5)
+#define RETRO_SIMD_SSE3     (1 << 6)
+#define RETRO_SIMD_SSSE3    (1 << 7)
+#define RETRO_SIMD_MMX      (1 << 8)
+#define RETRO_SIMD_MMXEXT   (1 << 9)
+#define RETRO_SIMD_SSE4     (1 << 10)
+#define RETRO_SIMD_SSE42    (1 << 11)
+#define RETRO_SIMD_AVX2     (1 << 12)
+#define RETRO_SIMD_VFPU     (1 << 13)
+#define RETRO_SIMD_PS       (1 << 14)
+#define RETRO_SIMD_AES      (1 << 15)
+
+typedef uint64_t retro_perf_tick_t;
+typedef int64_t retro_time_t;
+
+struct retro_perf_counter
+{
+   const char *ident;
+   retro_perf_tick_t start;
+   retro_perf_tick_t total;
+   retro_perf_tick_t call_cnt;
+
+   bool registered;
+};
+
+/* Returns current time in microseconds.
+ * Tries to use the most accurate timer available.
+ */
+typedef retro_time_t (*retro_perf_get_time_usec_t)(void);
+
+/* A simple counter. Usually nanoseconds, but can also be CPU cycles.
+ * Can be used directly if desired (when creating a more sophisticated 
+ * performance counter system).
+ * */
+typedef retro_perf_tick_t (*retro_perf_get_counter_t)(void);
+
+/* Returns a bit-mask of detected CPU features (RETRO_SIMD_*). */
+typedef uint64_t (*retro_get_cpu_features_t)(void);
+
+/* Asks frontend to log and/or display the state of performance counters.
+ * Performance counters can always be poked into manually as well.
+ */
+typedef void (*retro_perf_log_t)(void);
+
+/* Register a performance counter.
+ * ident field must be set with a discrete value and other values in 
+ * retro_perf_counter must be 0.
+ * Registering can be called multiple times. To avoid calling to 
+ * frontend redundantly, you can check registered field first. */
+typedef void (*retro_perf_register_t)(struct retro_perf_counter *counter);
+
+/* Starts a registered counter. */
+typedef void (*retro_perf_start_t)(struct retro_perf_counter *counter);
+
+/* Stops a registered counter. */
+typedef void (*retro_perf_stop_t)(struct retro_perf_counter *counter);
+
+/* For convenience it can be useful to wrap register, start and stop in macros.
+ * E.g.:
+ * #ifdef LOG_PERFORMANCE
+ * #define RETRO_PERFORMANCE_INIT(perf_cb, name) static struct retro_perf_counter name = {#name}; if (!name.registered) perf_cb.perf_register(&(name))
+ * #define RETRO_PERFORMANCE_START(perf_cb, name) perf_cb.perf_start(&(name))
+ * #define RETRO_PERFORMANCE_STOP(perf_cb, name) perf_cb.perf_stop(&(name))
+ * #else
+ * ... Blank macros ...
+ * #endif
+ *
+ * These can then be used mid-functions around code snippets.
+ *
+ * extern struct retro_perf_callback perf_cb;  * Somewhere in the core.
+ *
+ * void do_some_heavy_work(void)
+ * {
+ *    RETRO_PERFORMANCE_INIT(cb, work_1;
+ *    RETRO_PERFORMANCE_START(cb, work_1);
+ *    heavy_work_1();
+ *    RETRO_PERFORMANCE_STOP(cb, work_1);
+ *
+ *    RETRO_PERFORMANCE_INIT(cb, work_2);
+ *    RETRO_PERFORMANCE_START(cb, work_2);
+ *    heavy_work_2();
+ *    RETRO_PERFORMANCE_STOP(cb, work_2);
+ * }
+ *
+ * void retro_deinit(void)
+ * {
+ *    perf_cb.perf_log();  * Log all perf counters here for example.
+ * }
+ */
+
+struct retro_perf_callback
+{
+   retro_perf_get_time_usec_t    get_time_usec;
+   retro_get_cpu_features_t      get_cpu_features;
+
+   retro_perf_get_counter_t      get_perf_counter;
+   retro_perf_register_t         perf_register;
+   retro_perf_start_t            perf_start;
+   retro_perf_stop_t             perf_stop;
+   retro_perf_log_t              perf_log;
+};
+
+
 #define RETRO_ENVIRONMENT_GET_LOCATION_INTERFACE 29
                                            /* struct retro_location_callback * --
                                             * Gets access to the location interface.
@@ -623,6 +1265,50 @@ enum retro_mod
                                             * location-based information from the host device,
                                             * such as current latitude / longitude.
                                             */
+/* Sets the interval of time and/or distance at which to update/poll 
+ * location-based data.
+ *
+ * To ensure compatibility with all location-based implementations,
+ * values for both interval_ms and interval_distance should be provided.
+ *
+ * interval_ms is the interval expressed in milliseconds.
+ * interval_distance is the distance interval expressed in meters.
+ */
+typedef void (*retro_location_set_interval_t)(unsigned interval_ms,
+      unsigned interval_distance);
+
+/* Start location services. The device will start listening for changes to the
+ * current location at regular intervals (which are defined with 
+ * retro_location_set_interval_t). */
+typedef bool (*retro_location_start_t)(void);
+
+/* Stop location services. The device will stop listening for changes 
+ * to the current location. */
+typedef void (*retro_location_stop_t)(void);
+
+/* Get the position of the current location. Will set parameters to 
+ * 0 if no new  location update has happened since the last time. */
+typedef bool (*retro_location_get_position_t)(double *lat, double *lon,
+      double *horiz_accuracy, double *vert_accuracy);
+
+/* Callback which signals when the location driver is initialized 
+ * and/or deinitialized.
+ * retro_location_start_t can be called in initialized callback.
+ */
+typedef void (*retro_location_lifetime_status_t)(void);
+
+struct retro_location_callback
+{
+   retro_location_start_t         start;
+   retro_location_stop_t          stop;
+   retro_location_get_position_t  get_position;
+   retro_location_set_interval_t  set_interval;
+
+   retro_location_lifetime_status_t initialized;
+   retro_location_lifetime_status_t deinitialized;
+};
+
+
 #define RETRO_ENVIRONMENT_GET_CONTENT_DIRECTORY 30
                                            /* const char ** --
                                             * Returns the "content" directory of the frontend.
@@ -699,6 +1385,69 @@ enum retro_mod
                                             * If a core wants to use this functionality, SET_SUBSYSTEM_INFO
                                             * **MUST** be called from within retro_set_environment().
                                             */
+struct retro_subsystem_memory_info
+{
+   /* The extension associated with a memory type, e.g. "psram". */
+   const char *extension;
+
+   /* The memory type for retro_get_memory(). This should be at 
+    * least 0x100 to avoid conflict with standardized 
+    * libretro memory types. */
+   unsigned type;
+};
+
+struct retro_subsystem_content_info
+{
+   /* Describes what the content is (SGB BIOS, GB ROM, etc). */
+   const char *desc;
+
+   /* Same definition as retro_get_system_info(). */
+   const char *valid_extensions;
+
+   /* Same definition as retro_get_system_info(). */
+   bool need_fullpath;
+
+   /* Same definition as retro_get_system_info(). */
+   bool block_extract;
+
+   /* This is set if the content is required to load a game. 
+    * If this is set to false, a zeroed-out retro_game_info can be passed. */
+   bool required;
+
+   /* Content can have multiple associated persistent 
+    * memory types (retro_get_memory()). */
+   const struct retro_subsystem_memory_info *memory;
+   unsigned num_memory;
+};
+
+struct retro_subsystem_info
+{
+   /* Human-readable string of the subsystem type, e.g. "Super GameBoy" */
+   const char *desc;
+
+   /* A computer friendly short string identifier for the subsystem type.
+    * This name must be [a-z].
+    * E.g. if desc is "Super GameBoy", this can be "sgb".
+    * This identifier can be used for command-line interfaces, etc.
+    */
+   const char *ident;
+
+   /* Infos for each content file. The first entry is assumed to be the 
+    * "most significant" content for frontend purposes.
+    * E.g. with Super GameBoy, the first content should be the GameBoy ROM, 
+    * as it is the most "significant" content to a user.
+    * If a frontend creates new file paths based on the content used 
+    * (e.g. savestates), it should use the path for the first file to do so. */
+   const struct retro_subsystem_content_info *content;
+
+   /* Number of content files associated with a subsystem. */
+   unsigned num_content;
+   
+   /* The type passed to retro_load_game_special(). */
+   unsigned id;
+};
+
+
 #define RETRO_ENVIRONMENT_SET_CONTROLLER_INFO 35
                                            /* const struct retro_controller_info * --
                                             * This environment call lets a libretro core tell the frontend 
@@ -724,6 +1473,28 @@ enum retro_mod
                                             * Even if special device types are set in the libretro core, 
                                             * libretro should only poll input based on the base input device types.
                                             */
+struct retro_controller_description
+{
+   /* Human-readable description of the controller. Even if using a generic 
+    * input device type, this can be set to the particular device type the 
+    * core uses. */
+   const char *desc;
+
+   /* Device type passed to retro_set_controller_port_device(). If the device 
+    * type is a sub-class of a generic input device type, use the 
+    * RETRO_DEVICE_SUBCLASS macro to create an ID.
+    *
+    * E.g. RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 1). */
+   unsigned id;
+};
+
+struct retro_controller_info
+{
+   const struct retro_controller_description *types;
+   unsigned num_types;
+};
+
+
 #define RETRO_ENVIRONMENT_SET_MEMORY_MAPS (36 | RETRO_ENVIRONMENT_EXPERIMENTAL)
                                            /* const struct retro_memory_map * --
                                             * This environment call lets a libretro core tell the frontend 
@@ -737,40 +1508,6 @@ enum retro_mod
                                             *
                                             * Can be called from retro_init and retro_load_game.
                                             */
-#define RETRO_ENVIRONMENT_SET_GEOMETRY 37
-                                           /* const struct retro_game_geometry * --
-                                            * This environment call is similar to SET_SYSTEM_AV_INFO for changing 
-                                            * video parameters, but provides a guarantee that drivers will not be 
-                                            * reinitialized.
-                                            * This can only be called from within retro_run().
-                                            *
-                                            * The purpose of this call is to allow a core to alter nominal 
-                                            * width/heights as well as aspect ratios on-the-fly, which can be 
-                                            * useful for some emulators to change in run-time.
-                                            *
-                                            * max_width/max_height arguments are ignored and cannot be changed
-                                            * with this call as this could potentially require a reinitialization or a 
-                                            * non-constant time operation.
-                                            * If max_width/max_height are to be changed, SET_SYSTEM_AV_INFO is required.
-                                            *
-                                            * A frontend must guarantee that this environment call completes in 
-                                            * constant time.
-                                            */
-#define RETRO_ENVIRONMENT_GET_USERNAME 38 
-                                           /* const char **
-                                            * Returns the specified username of the frontend, if specified by the user.
-                                            * This username can be used as a nickname for a core that has online facilities 
-                                            * or any other mode where personalization of the user is desirable.
-                                            * The returned value can be NULL.
-                                            * If this environ callback is used by a core that requires a valid username, 
-                                            * a default username should be specified by the core.
-                                            */
-#define RETRO_ENVIRONMENT_GET_LANGUAGE 39
-                                           /* unsigned * --
-                                            * Returns the specified language of the frontend, if specified by the user.
-                                            * It can be used by the core for localization purposes.
-                                            */
-
 /* The frontend will never change this memory area once retro_load_game has returned. */
 #define RETRO_MEMDESC_CONST      (1 << 0)
 
@@ -794,6 +1531,7 @@ enum retro_mod
 #define RETRO_MEMDESC_MINSIZE_2  (1 << 24)
 #define RETRO_MEMDESC_MINSIZE_4  (2 << 24)
 #define RETRO_MEMDESC_MINSIZE_8  (3 << 24)
+
 struct retro_memory_descriptor
 {
    uint64_t flags;
@@ -915,686 +1653,42 @@ struct retro_memory_map
    unsigned num_descriptors;
 };
 
-struct retro_controller_description
-{
-   /* Human-readable description of the controller. Even if using a generic 
-    * input device type, this can be set to the particular device type the 
-    * core uses. */
-   const char *desc;
 
-   /* Device type passed to retro_set_controller_port_device(). If the device 
-    * type is a sub-class of a generic input device type, use the 
-    * RETRO_DEVICE_SUBCLASS macro to create an ID.
-    *
-    * E.g. RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 1). */
-   unsigned id;
-};
+#define RETRO_ENVIRONMENT_SET_GEOMETRY 37
+                                           /* const struct retro_game_geometry * --
+                                            * This environment call is similar to SET_SYSTEM_AV_INFO for changing 
+                                            * video parameters, but provides a guarantee that drivers will not be 
+                                            * reinitialized.
+                                            * This can only be called from within retro_run().
+                                            *
+                                            * The purpose of this call is to allow a core to alter nominal 
+                                            * width/heights as well as aspect ratios on-the-fly, which can be 
+                                            * useful for some emulators to change in run-time.
+                                            *
+                                            * max_width/max_height arguments are ignored and cannot be changed
+                                            * with this call as this could potentially require a reinitialization or a 
+                                            * non-constant time operation.
+                                            * If max_width/max_height are to be changed, SET_SYSTEM_AV_INFO is required.
+                                            *
+                                            * A frontend must guarantee that this environment call completes in 
+                                            * constant time.
+                                            */
+#define RETRO_ENVIRONMENT_GET_USERNAME 38 
+                                           /* const char **
+                                            * Returns the specified username of the frontend, if specified by the user.
+                                            * This username can be used as a nickname for a core that has online facilities 
+                                            * or any other mode where personalization of the user is desirable.
+                                            * The returned value can be NULL.
+                                            * If this environ callback is used by a core that requires a valid username, 
+                                            * a default username should be specified by the core.
+                                            */
+#define RETRO_ENVIRONMENT_GET_LANGUAGE 39
+                                           /* unsigned * --
+                                            * Returns the specified language of the frontend, if specified by the user.
+                                            * It can be used by the core for localization purposes.
+                                            */
 
-struct retro_controller_info
-{
-   const struct retro_controller_description *types;
-   unsigned num_types;
-};
 
-struct retro_subsystem_memory_info
-{
-   /* The extension associated with a memory type, e.g. "psram". */
-   const char *extension;
-
-   /* The memory type for retro_get_memory(). This should be at 
-    * least 0x100 to avoid conflict with standardized 
-    * libretro memory types. */
-   unsigned type;
-};
-
-struct retro_subsystem_content_info
-{
-   /* Describes what the content is (SGB BIOS, GB ROM, etc). */
-   const char *desc;
-
-   /* Same definition as retro_get_system_info(). */
-   const char *valid_extensions;
-
-   /* Same definition as retro_get_system_info(). */
-   bool need_fullpath;
-
-   /* Same definition as retro_get_system_info(). */
-   bool block_extract;
-
-   /* This is set if the content is required to load a game. 
-    * If this is set to false, a zeroed-out retro_game_info can be passed. */
-   bool required;
-
-   /* Content can have multiple associated persistent 
-    * memory types (retro_get_memory()). */
-   const struct retro_subsystem_memory_info *memory;
-   unsigned num_memory;
-};
-
-struct retro_subsystem_info
-{
-   /* Human-readable string of the subsystem type, e.g. "Super GameBoy" */
-   const char *desc;
-
-   /* A computer friendly short string identifier for the subsystem type.
-    * This name must be [a-z].
-    * E.g. if desc is "Super GameBoy", this can be "sgb".
-    * This identifier can be used for command-line interfaces, etc.
-    */
-   const char *ident;
-
-   /* Infos for each content file. The first entry is assumed to be the 
-    * "most significant" content for frontend purposes.
-    * E.g. with Super GameBoy, the first content should be the GameBoy ROM, 
-    * as it is the most "significant" content to a user.
-    * If a frontend creates new file paths based on the content used 
-    * (e.g. savestates), it should use the path for the first file to do so. */
-   const struct retro_subsystem_content_info *content;
-
-   /* Number of content files associated with a subsystem. */
-   unsigned num_content;
-   
-   /* The type passed to retro_load_game_special(). */
-   unsigned id;
-};
-
-enum retro_log_level
-{
-   RETRO_LOG_DEBUG = 0,
-   RETRO_LOG_INFO,
-   RETRO_LOG_WARN,
-   RETRO_LOG_ERROR,
-
-   RETRO_LOG_DUMMY = INT_MAX
-};
-
-/* Logging function. Takes log level argument as well. */
-typedef void (*retro_log_printf_t)(enum retro_log_level level,
-      const char *fmt, ...);
-
-struct retro_log_callback
-{
-   retro_log_printf_t log;
-};
-
-/* Performance related functions */
-
-/* ID values for SIMD CPU features */
-#define RETRO_SIMD_SSE      (1 << 0)
-#define RETRO_SIMD_SSE2     (1 << 1)
-#define RETRO_SIMD_VMX      (1 << 2)
-#define RETRO_SIMD_VMX128   (1 << 3)
-#define RETRO_SIMD_AVX      (1 << 4)
-#define RETRO_SIMD_NEON     (1 << 5)
-#define RETRO_SIMD_SSE3     (1 << 6)
-#define RETRO_SIMD_SSSE3    (1 << 7)
-#define RETRO_SIMD_MMX      (1 << 8)
-#define RETRO_SIMD_MMXEXT   (1 << 9)
-#define RETRO_SIMD_SSE4     (1 << 10)
-#define RETRO_SIMD_SSE42    (1 << 11)
-#define RETRO_SIMD_AVX2     (1 << 12)
-#define RETRO_SIMD_VFPU     (1 << 13)
-#define RETRO_SIMD_PS       (1 << 14)
-#define RETRO_SIMD_AES      (1 << 15)
-
-typedef uint64_t retro_perf_tick_t;
-typedef int64_t retro_time_t;
-
-struct retro_perf_counter
-{
-   const char *ident;
-   retro_perf_tick_t start;
-   retro_perf_tick_t total;
-   retro_perf_tick_t call_cnt;
-
-   bool registered;
-};
-
-/* Returns current time in microseconds.
- * Tries to use the most accurate timer available.
- */
-typedef retro_time_t (*retro_perf_get_time_usec_t)(void);
-
-/* A simple counter. Usually nanoseconds, but can also be CPU cycles.
- * Can be used directly if desired (when creating a more sophisticated 
- * performance counter system).
- * */
-typedef retro_perf_tick_t (*retro_perf_get_counter_t)(void);
-
-/* Returns a bit-mask of detected CPU features (RETRO_SIMD_*). */
-typedef uint64_t (*retro_get_cpu_features_t)(void);
-
-/* Asks frontend to log and/or display the state of performance counters.
- * Performance counters can always be poked into manually as well.
- */
-typedef void (*retro_perf_log_t)(void);
-
-/* Register a performance counter.
- * ident field must be set with a discrete value and other values in 
- * retro_perf_counter must be 0.
- * Registering can be called multiple times. To avoid calling to 
- * frontend redundantly, you can check registered field first. */
-typedef void (*retro_perf_register_t)(struct retro_perf_counter *counter);
-
-/* Starts a registered counter. */
-typedef void (*retro_perf_start_t)(struct retro_perf_counter *counter);
-
-/* Stops a registered counter. */
-typedef void (*retro_perf_stop_t)(struct retro_perf_counter *counter);
-
-/* For convenience it can be useful to wrap register, start and stop in macros.
- * E.g.:
- * #ifdef LOG_PERFORMANCE
- * #define RETRO_PERFORMANCE_INIT(perf_cb, name) static struct retro_perf_counter name = {#name}; if (!name.registered) perf_cb.perf_register(&(name))
- * #define RETRO_PERFORMANCE_START(perf_cb, name) perf_cb.perf_start(&(name))
- * #define RETRO_PERFORMANCE_STOP(perf_cb, name) perf_cb.perf_stop(&(name))
- * #else
- * ... Blank macros ...
- * #endif
- *
- * These can then be used mid-functions around code snippets.
- *
- * extern struct retro_perf_callback perf_cb;  * Somewhere in the core.
- *
- * void do_some_heavy_work(void)
- * {
- *    RETRO_PERFORMANCE_INIT(cb, work_1;
- *    RETRO_PERFORMANCE_START(cb, work_1);
- *    heavy_work_1();
- *    RETRO_PERFORMANCE_STOP(cb, work_1);
- *
- *    RETRO_PERFORMANCE_INIT(cb, work_2);
- *    RETRO_PERFORMANCE_START(cb, work_2);
- *    heavy_work_2();
- *    RETRO_PERFORMANCE_STOP(cb, work_2);
- * }
- *
- * void retro_deinit(void)
- * {
- *    perf_cb.perf_log();  * Log all perf counters here for example.
- * }
- */
-
-struct retro_perf_callback
-{
-   retro_perf_get_time_usec_t    get_time_usec;
-   retro_get_cpu_features_t      get_cpu_features;
-
-   retro_perf_get_counter_t      get_perf_counter;
-   retro_perf_register_t         perf_register;
-   retro_perf_start_t            perf_start;
-   retro_perf_stop_t             perf_stop;
-   retro_perf_log_t              perf_log;
-};
-
-/* FIXME: Document the sensor API and work out behavior.
- * It will be marked as experimental until then.
- */
-enum retro_sensor_action
-{
-   RETRO_SENSOR_ACCELEROMETER_ENABLE = 0,
-   RETRO_SENSOR_ACCELEROMETER_DISABLE,
-
-   RETRO_SENSOR_DUMMY = INT_MAX
-};
-
-/* Id values for SENSOR types. */
-#define RETRO_SENSOR_ACCELEROMETER_X 0
-#define RETRO_SENSOR_ACCELEROMETER_Y 1
-#define RETRO_SENSOR_ACCELEROMETER_Z 2
-
-typedef bool (*retro_set_sensor_state_t)(unsigned port, 
-      enum retro_sensor_action action, unsigned rate);
-
-typedef float (*retro_sensor_get_input_t)(unsigned port, unsigned id);
-
-struct retro_sensor_interface
-{
-   retro_set_sensor_state_t set_sensor_state;
-   retro_sensor_get_input_t get_sensor_input;
-};
-
-enum retro_camera_buffer
-{
-   RETRO_CAMERA_BUFFER_OPENGL_TEXTURE = 0,
-   RETRO_CAMERA_BUFFER_RAW_FRAMEBUFFER,
-
-   RETRO_CAMERA_BUFFER_DUMMY = INT_MAX
-};
-
-/* Starts the camera driver. Can only be called in retro_run(). */
-typedef bool (*retro_camera_start_t)(void);
-
-/* Stops the camera driver. Can only be called in retro_run(). */
-typedef void (*retro_camera_stop_t)(void);
-
-/* Callback which signals when the camera driver is initialized 
- * and/or deinitialized.
- * retro_camera_start_t can be called in initialized callback.
- */
-typedef void (*retro_camera_lifetime_status_t)(void);
-
-/* A callback for raw framebuffer data. buffer points to an XRGB8888 buffer.
- * Width, height and pitch are similar to retro_video_refresh_t.
- * First pixel is top-left origin.
- */
-typedef void (*retro_camera_frame_raw_framebuffer_t)(const uint32_t *buffer, 
-      unsigned width, unsigned height, size_t pitch);
-
-/* A callback for when OpenGL textures are used.
- *
- * texture_id is a texture owned by camera driver.
- * Its state or content should be considered immutable, except for things like 
- * texture filtering and clamping.
- *
- * texture_target is the texture target for the GL texture.
- * These can include e.g. GL_TEXTURE_2D, GL_TEXTURE_RECTANGLE, and possibly 
- * more depending on extensions.
- *
- * affine points to a packed 3x3 column-major matrix used to apply an affine 
- * transform to texture coordinates. (affine_matrix * vec3(coord_x, coord_y, 1.0))
- * After transform, normalized texture coord (0, 0) should be bottom-left 
- * and (1, 1) should be top-right (or (width, height) for RECTANGLE).
- *
- * GL-specific typedefs are avoided here to avoid relying on gl.h in 
- * the API definition.
- */
-typedef void (*retro_camera_frame_opengl_texture_t)(unsigned texture_id, 
-      unsigned texture_target, const float *affine);
-
-struct retro_camera_callback
-{
-   /* Set by libretro core. 
-    * Example bitmask: caps = (1 << RETRO_CAMERA_BUFFER_OPENGL_TEXTURE) | (1 << RETRO_CAMERA_BUFFER_RAW_FRAMEBUFFER).
-    */
-   uint64_t caps; 
-
-   unsigned width; /* Desired resolution for camera. Is only used as a hint. */
-   unsigned height;
-   retro_camera_start_t start; /* Set by frontend. */
-   retro_camera_stop_t stop; /* Set by frontend. */
-
-   /* Set by libretro core if raw framebuffer callbacks will be used. */
-   retro_camera_frame_raw_framebuffer_t frame_raw_framebuffer;
-   /* Set by libretro core if OpenGL texture callbacks will be used. */
-   retro_camera_frame_opengl_texture_t frame_opengl_texture; 
-
-   /* Set by libretro core. Called after camera driver is initialized and 
-    * ready to be started.
-    * Can be NULL, in which this callback is not called.
-    */
-   retro_camera_lifetime_status_t initialized;
-
-   /* Set by libretro core. Called right before camera driver is 
-    * deinitialized.
-    * Can be NULL, in which this callback is not called.
-    */
-   retro_camera_lifetime_status_t deinitialized;
-};
-
-/* Sets the interval of time and/or distance at which to update/poll 
- * location-based data.
- *
- * To ensure compatibility with all location-based implementations,
- * values for both interval_ms and interval_distance should be provided.
- *
- * interval_ms is the interval expressed in milliseconds.
- * interval_distance is the distance interval expressed in meters.
- */
-typedef void (*retro_location_set_interval_t)(unsigned interval_ms,
-      unsigned interval_distance);
-
-/* Start location services. The device will start listening for changes to the
- * current location at regular intervals (which are defined with 
- * retro_location_set_interval_t). */
-typedef bool (*retro_location_start_t)(void);
-
-/* Stop location services. The device will stop listening for changes 
- * to the current location. */
-typedef void (*retro_location_stop_t)(void);
-
-/* Get the position of the current location. Will set parameters to 
- * 0 if no new  location update has happened since the last time. */
-typedef bool (*retro_location_get_position_t)(double *lat, double *lon,
-      double *horiz_accuracy, double *vert_accuracy);
-
-/* Callback which signals when the location driver is initialized 
- * and/or deinitialized.
- * retro_location_start_t can be called in initialized callback.
- */
-typedef void (*retro_location_lifetime_status_t)(void);
-
-struct retro_location_callback
-{
-   retro_location_start_t         start;
-   retro_location_stop_t          stop;
-   retro_location_get_position_t  get_position;
-   retro_location_set_interval_t  set_interval;
-
-   retro_location_lifetime_status_t initialized;
-   retro_location_lifetime_status_t deinitialized;
-};
-
-enum retro_rumble_effect
-{
-   RETRO_RUMBLE_STRONG = 0,
-   RETRO_RUMBLE_WEAK = 1,
-
-   RETRO_RUMBLE_DUMMY = INT_MAX
-};
-
-/* Sets rumble state for joypad plugged in port 'port'. 
- * Rumble effects are controlled independently,
- * and setting e.g. strong rumble does not override weak rumble.
- * Strength has a range of [0, 0xffff].
- *
- * Returns true if rumble state request was honored. 
- * Calling this before first retro_run() is likely to return false. */
-typedef bool (*retro_set_rumble_state_t)(unsigned port, 
-      enum retro_rumble_effect effect, uint16_t strength);
-
-struct retro_rumble_interface
-{
-   retro_set_rumble_state_t set_rumble_state;
-};
-
-/* Notifies libretro that audio data should be written. */
-typedef void (*retro_audio_callback_t)(void);
-
-/* True: Audio driver in frontend is active, and callback is 
- * expected to be called regularily.
- * False: Audio driver in frontend is paused or inactive. 
- * Audio callback will not be called until set_state has been 
- * called with true.
- * Initial state is false (inactive).
- */
-typedef void (*retro_audio_set_state_callback_t)(bool enabled);
-
-struct retro_audio_callback
-{
-   retro_audio_callback_t callback;
-   retro_audio_set_state_callback_t set_state;
-};
-
-/* Notifies a libretro core of time spent since last invocation 
- * of retro_run() in microseconds.
- *
- * It will be called right before retro_run() every frame.
- * The frontend can tamper with timing to support cases like 
- * fast-forward, slow-motion and framestepping.
- *
- * In those scenarios the reference frame time value will be used. */
-typedef int64_t retro_usec_t;
-typedef void (*retro_frame_time_callback_t)(retro_usec_t usec);
-struct retro_frame_time_callback
-{
-   retro_frame_time_callback_t callback;
-   /* Represents the time of one frame. It is computed as 
-    * 1000000 / fps, but the implementation will resolve the 
-    * rounding to ensure that framestepping, etc is exact. */
-   retro_usec_t reference;
-};
-
-/* Pass this to retro_video_refresh_t if rendering to hardware.
- * Passing NULL to retro_video_refresh_t is still a frame dupe as normal.
- * */
-#define RETRO_HW_FRAME_BUFFER_VALID ((void*)-1)
-
-typedef retro_proc_address_t (*retro_get_proc_address_t)(const char *sym);
-
-/* Invalidates the current HW context.
- * Any GL state is lost, and must not be deinitialized explicitly.
- * If explicit deinitialization is desired by the libretro core,
- * it should implement context_destroy callback.
- * If called, all GPU resources must be reinitialized.
- * Usually called when frontend reinits video driver.
- * Also called first time video driver is initialized, 
- * allowing libretro core to initialize resources.
- */
-typedef void (*retro_hw_context_reset_t)(void);
-
-/* Gets current framebuffer which is to be rendered to.
- * Could change every frame potentially.
- */
-typedef uintptr_t (*retro_hw_get_current_framebuffer_t)(void);
-
-/* Get a symbol from HW context. */
-typedef void (*retro_proc_address_t)(void);
-typedef retro_proc_address_t (*retro_hw_get_proc_address_t)(const char *sym);
-
-enum retro_hw_context_type
-{
-   RETRO_HW_CONTEXT_NONE             = 0,
-   /* OpenGL 2.x. Driver can choose to use latest compatibility context. */
-   RETRO_HW_CONTEXT_OPENGL           = 1, 
-   /* OpenGL ES 2.0. */
-   RETRO_HW_CONTEXT_OPENGLES2        = 2,
-   /* Modern desktop core GL context. Use version_major/
-    * version_minor fields to set GL version. */
-   RETRO_HW_CONTEXT_OPENGL_CORE      = 3,
-   /* OpenGL ES 3.0 */
-   RETRO_HW_CONTEXT_OPENGLES3        = 4,
-   /* OpenGL ES 3.1+. Set version_major/version_minor. For GLES2 and GLES3,
-    * use the corresponding enums directly. */
-   RETRO_HW_CONTEXT_OPENGLES_VERSION = 5,
-
-   RETRO_HW_CONTEXT_DUMMY = INT_MAX
-};
-
-struct retro_hw_render_callback
-{
-   /* Which API to use. Set by libretro core. */
-   enum retro_hw_context_type context_type;
-
-   /* Called when a context has been created or when it has been reset.
-    * An OpenGL context is only valid after context_reset() has been called.
-    *
-    * When context_reset is called, OpenGL resources in the libretro 
-    * implementation are guaranteed to be invalid.
-    *
-    * It is possible that context_reset is called multiple times during an 
-    * application lifecycle.
-    * If context_reset is called without any notification (context_destroy),
-    * the OpenGL context was lost and resources should just be recreated
-    * without any attempt to "free" old resources.
-    */
-   retro_hw_context_reset_t context_reset;
-
-   /* Set by frontend. */
-   retro_hw_get_current_framebuffer_t get_current_framebuffer;
-
-   /* Set by frontend. */
-   retro_hw_get_proc_address_t get_proc_address;
-
-   /* Set if render buffers should have depth component attached. */
-   bool depth;
-
-   /* Set if stencil buffers should be attached. */
-   bool stencil;
-
-   /* If depth and stencil are true, a packed 24/8 buffer will be added. 
-    * Only attaching stencil is invalid and will be ignored. */
-
-   /* Use conventional bottom-left origin convention. If false, 
-    * standard libretro top-left origin semantics are used. */
-   bool bottom_left_origin;
-   
-   /* Major version number for core GL context or GLES 3.1+. */
-   unsigned version_major;
-
-   /* Minor version number for core GL context or GLES 3.1+. */
-   unsigned version_minor;
-
-   /* If this is true, the frontend will go very far to avoid 
-    * resetting context in scenarios like toggling fullscreen, etc.
-    */
-   bool cache_context;
-
-   /* The reset callback might still be called in extreme situations 
-    * such as if the context is lost beyond recovery.
-    *
-    * For optimal stability, set this to false, and allow context to be 
-    * reset at any time.
-    */
-   
-   /* A callback to be called before the context is destroyed in a 
-    * controlled way by the frontend. */
-   retro_hw_context_reset_t context_destroy;
-
-   /* OpenGL resources can be deinitialized cleanly at this step.
-    * context_destroy can be set to NULL, in which resources will 
-    * just be destroyed without any notification.
-    *
-    * Even when context_destroy is non-NULL, it is possible that 
-    * context_reset is called without any destroy notification.
-    * This happens if context is lost by external factors (such as 
-    * notified by GL_ARB_robustness).
-    *
-    * In this case, the context is assumed to be already dead,
-    * and the libretro implementation must not try to free any OpenGL 
-    * resources in the subsequent context_reset.
-    */
-
-   /* Creates a debug context. */
-   bool debug_context;
-};
-
-/* Callback type passed in RETRO_ENVIRONMENT_SET_KEYBOARD_CALLBACK. 
- * Called by the frontend in response to keyboard events.
- * down is set if the key is being pressed, or false if it is being released.
- * keycode is the RETROK value of the char.
- * character is the text character of the pressed key. (UTF-32).
- * key_modifiers is a set of RETROKMOD values or'ed together.
- *
- * The pressed/keycode state can be indepedent of the character.
- * It is also possible that multiple characters are generated from a 
- * single keypress.
- * Keycode events should be treated separately from character events.
- * However, when possible, the frontend should try to synchronize these.
- * If only a character is posted, keycode should be RETROK_UNKNOWN.
- *
- * Similarily if only a keycode event is generated with no corresponding 
- * character, character should be 0.
- */
-typedef void (*retro_keyboard_event_t)(bool down, unsigned keycode, 
-      uint32_t character, uint16_t key_modifiers);
-
-struct retro_keyboard_callback
-{
-   retro_keyboard_event_t callback;
-};
-
-/* Callbacks for RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE.
- * Should be set for implementations which can swap out multiple disk 
- * images in runtime.
- *
- * If the implementation can do this automatically, it should strive to do so.
- * However, there are cases where the user must manually do so.
- *
- * Overview: To swap a disk image, eject the disk image with 
- * set_eject_state(true).
- * Set the disk index with set_image_index(index). Insert the disk again 
- * with set_eject_state(false).
- */
-
-/* If ejected is true, "ejects" the virtual disk tray.
- * When ejected, the disk image index can be set.
- */
-typedef bool (*retro_set_eject_state_t)(bool ejected);
-
-/* Gets current eject state. The initial state is 'not ejected'. */
-typedef bool (*retro_get_eject_state_t)(void);
-
-/* Gets current disk index. First disk is index 0.
- * If return value is >= get_num_images(), no disk is currently inserted.
- */
-typedef unsigned (*retro_get_image_index_t)(void);
-
-/* Sets image index. Can only be called when disk is ejected.
- * The implementation supports setting "no disk" by using an 
- * index >= get_num_images().
- */
-typedef bool (*retro_set_image_index_t)(unsigned index);
-
-/* Gets total number of images which are available to use. */
-typedef unsigned (*retro_get_num_images_t)(void);
-
-struct retro_game_info;
-
-/* Replaces the disk image associated with index.
- * Arguments to pass in info have same requirements as retro_load_game().
- * Virtual disk tray must be ejected when calling this.
- *
- * Replacing a disk image with info = NULL will remove the disk image 
- * from the internal list.
- * As a result, calls to get_image_index() can change.
- *
- * E.g. replace_image_index(1, NULL), and previous get_image_index() 
- * returned 4 before.
- * Index 1 will be removed, and the new index is 3.
- */
-typedef bool (*retro_replace_image_index_t)(unsigned index,
-      const struct retro_game_info *info);
-
-/* Adds a new valid index (get_num_images()) to the internal disk list.
- * This will increment subsequent return values from get_num_images() by 1.
- * This image index cannot be used until a disk image has been set 
- * with replace_image_index. */
-typedef bool (*retro_add_image_index_t)(void);
-
-struct retro_disk_control_callback
-{
-   retro_set_eject_state_t set_eject_state;
-   retro_get_eject_state_t get_eject_state;
-
-   retro_get_image_index_t get_image_index;
-   retro_set_image_index_t set_image_index;
-   retro_get_num_images_t  get_num_images;
-
-   retro_replace_image_index_t replace_image_index;
-   retro_add_image_index_t add_image_index;
-};
-
-enum retro_pixel_format
-{
-   /* RGB565, native endian.
-    * This pixel format is the recommended format to use if a 15/16-bit
-    * format is desired as it is the pixel format that is typically 
-    * available on a wide range of low-power devices.
-    *
-    * It is also natively supported in APIs like OpenGL ES. */
-   RETRO_PIXEL_FORMAT_RGB565   = 0,
-
-   /* XRGB8888, native endian.
-    * X bits are ignored. */
-   RETRO_PIXEL_FORMAT_XRGB8888 = 1,
-
-   /* Ensure sizeof() == sizeof(int). */
-   RETRO_PIXEL_FORMAT_UNKNOWN  = INT_MAX
-};
-
-struct retro_message
-{
-   const char *msg;        /* Message to be displayed. */
-   unsigned    frames;     /* Duration in frames of message. */
-};
-
-/* Describes how the libretro implementation maps a libretro input bind
- * to its internal input system through a human readable string.
- * This string can be used to better let a user configure input. */
-struct retro_input_descriptor
-{
-   /* Associates given parameters with a description. */
-   unsigned port;
-   unsigned device;
-   unsigned index;
-   unsigned id;
-
-   /* Human readable description for parameters.
-    * The pointer must remain valid until
-    * retro_unload_game() is called. */
-   const char *description; 
-};
 
 struct retro_system_info
 {
@@ -1659,103 +1753,6 @@ struct retro_system_av_info
 {
    struct retro_game_geometry geometry;
    struct retro_system_timing timing;
-};
-
-
-
-enum retro_variable_type
-{
-   /* Tells that the variable list has ended. */
-   RETRO_VARIABLE_TYPE_TERMINATOR,
-
-   /* A separator in the list. Use to group similar items together.
-    * All other members are ignored for items of this type. */
-   RETRO_VARIABLE_TYPE_SEPARATOR,
-
-   /* Enumeration. 'values' is const char * const *, with one entry
-    * for each item; terminated by a NULL. 'initial' is a const unsigned int *
-    * containing the index of the default value. */
-   RETRO_VARIABLE_TYPE_ENUM,
-
-   /* Boolean. 'values' is NULL and 'initial' is bool*. */
-   RETRO_VARIABLE_TYPE_BOOL,
-
-   /* Integer. 'values' is const int * containing two entries: the lowest and
-    * highest valid values, inclusive. 'initial' is also a const int *. */
-   RETRO_VARIABLE_TYPE_INT,
-   
-   /* Floating point. Same as RETRO_VARIABLE_INT, except with 'float'
-    * instead of 'int'.
-    * The frontend is responsible for calculating a reasonable step size. */
-   RETRO_VARIABLE_TYPE_FLOAT,
-   
-   RETRO_VARIABLE_TYPE_DUMMY = INT_MAX
-};
-
-enum retro_variable_change
-{
-   /* Changes take effect at the next retro_run, or possibly takes a few frames
-    * (<= 0.1 seconds, otherwise DELAYED should be used). */
-   RETRO_VARIABLE_CHANGE_INSTANT,
-
-   /* Changes take effect during retro_run, but not instantly; for example,
-    * it may be delayed until the next level is loaded. */
-   RETRO_VARIABLE_CHANGE_DELAYED,
-
-   /* Only used during retro_load_game, or possibly retro_reset. */
-   RETRO_VARIABLE_CHANGE_RESET,
-
-   /* This variable is currently ignored; it is only usable if other options are
-    * changed first. If they are, RETRO_ENVIRONMENT_SET_VARIABLES must be called
-    * again. */
-   RETRO_VARIABLE_CHANGE_WRONG_OPTS,
-
-   /* This variable is not applicable for this game. */
-   RETRO_VARIABLE_CHANGE_WRONG_GAME,
-
-   RETRO_VARIABLE_CHANGE_DUMMY = INT_MAX
-};
-
-struct retro_variable
-{
-   /* Variable type. See above. */
-   enum retro_variable_type type;
-   /* When the implementation will acknowledge changes to this variable.
-    * Note that the front is allowed to change variables marked
-    * currently unusable. */
-   enum retro_variable_change change;
-
-   /* Variable name, to be used internally. Suitable for
-    * saving to configuration files. Example: gb_colorize */
-   const char *name;
-   /* Variable name, to show the user. Suitable for GUIs.
-    * Example: Game Boy colorization */
-   const char *pub_name;
-   /* Variable description. Suitable as a second line in GUIs.
-    * Example: Emulate fake colors on black&white games. */
-   const char *description;
-   /* Possible values. See enum retro_variable_type for what type it has.
-    * Example: { "Enabled", "Disabled", NULL }
-    * (though that one should be a BOOL instead). */
-   void *values;
-   /* Default value. Example: 1 */
-   void *initial;
-
-   /* Called by the frontend every time this variable changes, or NULL to ignore.
-    * Can be different for different variables.
-    * ID is the index to the array given to RETRO_ENVIRONMENT_SET_VARIABLES.
-    * Separators have IDs, but their value must not be set or queried.
-    * 'value' has the same type as 'default'.
-    * Can be called during RETRO_ENVIRONMENT_SET_VARIABLES. */
-   void (*change_notify)(unsigned int id, void *value);
-};
-
-struct retro_variable_query
-{
-   /* Same ID as in change_notify. Core sets this before calling GET_VARIABLE. */
-   unsigned int id;
-   /* Same type as initial and change_notify. Front sets this. */
-   void *value;
 };
 
 struct retro_game_info
@@ -1845,6 +1842,23 @@ void retro_get_system_info(struct retro_system_info *info);
  * desire a particular aspect ratio. */
 void retro_get_system_av_info(struct retro_system_av_info *info);
 
+enum retro_pixel_format
+{
+   /* RGB565, native endian.
+    * This pixel format is the recommended format to use if a 15/16-bit
+    * format is desired as it is the pixel format that is typically 
+    * available on a wide range of low-power devices.
+    *
+    * It is also natively supported in APIs like OpenGL ES. */
+   RETRO_PIXEL_FORMAT_RGB565   = 0,
+
+   /* XRGB8888, native endian.
+    * X bits are ignored. */
+   RETRO_PIXEL_FORMAT_XRGB8888 = 1,
+
+   /* Ensure sizeof() == sizeof(int). */
+   RETRO_PIXEL_FORMAT_UNKNOWN  = INT_MAX
+};
 /* Tells the core which pixel format the front prefers, and asks the core if
  * that is acceptable. The front will use the returned pixel format. */
 enum retro_pixel_format retro_get_pixel_format(enum retro_pixel_format);
