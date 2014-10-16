@@ -1637,12 +1637,15 @@ struct retro_system_info
                                    * contain any version numbers, etc. */
    const char *library_version;   /* Descriptive version of core. */
 
-   const char *valid_extensions;  /* A string listing probably content 
-                                   * extensions the core will be able to 
-                                   * load, separated with pipe.
-                                   * I.e. "bin|rom|iso".
-                                   * Typically used for a GUI to filter 
-                                   * out extensions. */
+   /* A string listing probably content extensions the core will be able to 
+    * load, separated with pipe.
+    * I.e. "bin|rom|iso".
+    * Typically used for a GUI to filter out extensions.
+    *
+    * NULL means the core can run standalone and does not want any content;
+    * retro_load_game() should be called with NULL as argument.
+    */
+   const char *valid_extensions;
 
    /* If true, retro_load_game() is guaranteed to provide a valid pathname 
     * in retro_game_info::path.
