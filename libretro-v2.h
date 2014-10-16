@@ -818,14 +818,29 @@ enum retro_mod
                                             * It can be used by the core for localization purposes.
                                             */
 
-#define RETRO_MEMDESC_CONST     (1 << 0)   /* The frontend will never change this memory area once retro_load_game has returned. */
-#define RETRO_MEMDESC_BIGENDIAN (1 << 1)   /* The memory area contains big endian data. Default is little endian. */
-#define RETRO_MEMDESC_ALIGN_2   (1 << 16)  /* All memory access in this area is aligned to their own size, or 2, whichever is smaller. */
-#define RETRO_MEMDESC_ALIGN_4   (2 << 16)
-#define RETRO_MEMDESC_ALIGN_8   (3 << 16)
-#define RETRO_MEMDESC_MINSIZE_2 (1 << 24)  /* All memory in this region is accessed at least 2 bytes at the time. */
-#define RETRO_MEMDESC_MINSIZE_4 (2 << 24)
-#define RETRO_MEMDESC_MINSIZE_8 (3 << 24)
+/* The frontend will never change this memory area once retro_load_game has returned. */
+#define RETRO_MEMDESC_CONST      (1 << 0)
+
+/* The memory area contains big endian data. Default is little endian. */
+#define RETRO_MEMDESC_BIGENDIAN  (1 << 1)
+
+/* The memory area switches between different sets of contents depending on
+ * when it's read.
+ * If this is set, 'len' must be bigger than what fits in 'select', and the
+ * contents will loop around.
+ * For example, if 'select' is 0xFFE000 and 'len' is 0x8000,
+ * each byte here has four different values. */
+#define RETRO_MEMDESC_BANKSWITCH (1 << 2)
+
+/* All memory access in this area is aligned to their own size, or 2, whichever is smaller. */
+#define RETRO_MEMDESC_ALIGN_2    (1 << 16)
+#define RETRO_MEMDESC_ALIGN_4    (2 << 16)
+#define RETRO_MEMDESC_ALIGN_8    (3 << 16)
+
+/* All memory in this region is accessed at least 2 bytes at the time. */
+#define RETRO_MEMDESC_MINSIZE_2  (1 << 24)
+#define RETRO_MEMDESC_MINSIZE_4  (2 << 24)
+#define RETRO_MEMDESC_MINSIZE_8  (3 << 24)
 struct retro_memory_descriptor
 {
    uint64_t flags;
