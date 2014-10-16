@@ -1013,7 +1013,7 @@ struct retro_subsystem_memory_info
    unsigned type;
 };
 
-struct retro_subsystem_rom_info
+struct retro_subsystem_content_info
 {
    /* Describes what the content is (SGB BIOS, GB ROM, etc). */
    const char *desc;
@@ -1054,11 +1054,11 @@ struct retro_subsystem_info
     * E.g. with Super GameBoy, the first content should be the GameBoy ROM, 
     * as it is the most "significant" content to a user.
     * If a frontend creates new file paths based on the content used 
-    * (e.g. savestates), it should use the path for the first ROM to do so. */
-   const struct retro_subsystem_rom_info *roms;
+    * (e.g. savestates), it should use the path for the first file to do so. */
+   const struct retro_subsystem_content_info *content;
 
    /* Number of content files associated with a subsystem. */
-   unsigned num_roms;
+   unsigned num_content;
    
    /* The type passed to retro_load_game_special(). */
    unsigned id;
@@ -1769,7 +1769,7 @@ struct retro_game_info
 {
    const char *path;       /* Path to game, UTF-8 encoded.
                             * Usually used as a reference.
-                            * May be NULL if rom was loaded from stdin
+                            * May be NULL if content was loaded from stdin
                             * or similar. 
                             * retro_system_info::need_fullpath guaranteed 
                             * that this path is valid. */
