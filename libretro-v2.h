@@ -410,24 +410,6 @@ enum retro_mod
 #define RETRO_ENVIRONMENT_PRIVATE 0x20000
 
 /* Environment commands. */
-/* #define RETRO_ENVIRONMENT_SET_ROTATION     Removed due to lack of justification for why it can't go through SET_HW_RENDER.
-                                            * const unsigned * --
-                                            * Sets screen rotation of graphics.
-                                            * Is only implemented if rotation can be accelerated by hardware.
-                                            * Valid values are 0, 1, 2, 3, which rotates screen by 0, 90, 180, 
-                                            * 270 degrees counter-clockwise respectively.
-                                            */
-/* #define RETRO_ENVIRONMENT_GET_OVERSCAN     Removed due to lack of justifcation for why it can not be a core option.
-                                            * bool * --
-                                            * Boolean value whether or not the implementation should use overscan, 
-                                            * or crop away overscan.
-                                            */
-/* #define RETRO_ENVIRONMENT_GET_CAN_DUPE     Now mandatory.
-                                            * bool * --
-                                            * Boolean value whether or not frontend supports frame duping,
-                                            * passing NULL to video frame callback.
-                                            */
-
 #define RETRO_ENVIRONMENT_SET_MESSAGE   6  /* const struct retro_message * --
                                             * Sets a message to be displayed in implementation-specific manner 
                                             * for a certain amount of 'frames'.
@@ -470,17 +452,6 @@ enum retro_mod
                                             * memory cards, etc, for lack of a better place to put it.
                                             * This is now discouraged, and if possible, cores should try to 
                                             * use the new GET_SAVE_DIRECTORY.
-                                            */
-/* #define RETRO_ENVIRONMENT_SET_PIXEL_FORMAT Now a function.
-                                            * const enum retro_pixel_format * --
-                                            * Sets the internal pixel format used by the implementation.
-                                            * The default pixel format is RETRO_PIXEL_FORMAT_0RGB1555.
-                                            * This pixel format however, is deprecated (see enum retro_pixel_format).
-                                            * If the call returns false, the frontend does not support this pixel 
-                                            * format.
-                                            *
-                                            * This function should be called inside retro_load_game() or 
-                                            * retro_get_system_av_info().
                                             */
 #define RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS 11
                                            /* const struct retro_input_descriptor * --
@@ -529,13 +500,6 @@ enum retro_mod
 #define RETRO_ENVIRONMENT_GET_VARIABLE 16
                                            /* struct retro_variable_query * --
                                             * Asks the frontend what value a variable has.
-                                            */
-/* #define RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME Now indicated by setting retro_system_info::valid_extensions to NULL.
-                                            * const bool * --
-                                            * If true, the libretro implementation supports calls to 
-                                            * retro_load_game() with NULL as argument.
-                                            * Used by cores which can run without particular game data.
-                                            * This should be called within retro_set_environment() only.
                                             */
 #define RETRO_ENVIRONMENT_GET_LIBRETRO_PATH 19
                                            /* const char ** --
@@ -716,17 +680,6 @@ enum retro_mod
                                             * If this returns false, the frontend does not acknowledge a 
                                             * changed av_info struct.
                                             */
-/* #define RETRO_ENVIRONMENT_SET_PROC_ADDRESS_CALLBACK Now a function (retro_request).
-                                            * const struct retro_get_proc_address_interface * --
-                                            * Allows a libretro core to announce support for the 
-                                            * get_proc_address() interface.
-                                            * This interface allows for a standard way to extend libretro where 
-                                            * use of environment calls are too indirect,
-                                            * e.g. for cases where the frontend wants to call directly into the core.
-                                            *
-                                            * If a core wants to expose this interface, SET_PROC_ADDRESS_CALLBACK 
-                                            * **MUST** be called from within retro_set_environment().
-                                            */
 #define RETRO_ENVIRONMENT_SET_SUBSYSTEM_INFO 34
                                            /* const struct retro_subsystem_info * --
                                             * This environment call introduces the concept of libretro "subsystems".
@@ -816,6 +769,54 @@ enum retro_mod
                                            /* unsigned * --
                                             * Returns the specified language of the frontend, if specified by the user.
                                             * It can be used by the core for localization purposes.
+                                            */
+
+/* Deleted envs */
+/* #define RETRO_ENVIRONMENT_SET_ROTATION     Removed due to lack of justification for why it can't go through SET_HW_RENDER.
+                                            * const unsigned * --
+                                            * Sets screen rotation of graphics.
+                                            * Is only implemented if rotation can be accelerated by hardware.
+                                            * Valid values are 0, 1, 2, 3, which rotates screen by 0, 90, 180, 
+                                            * 270 degrees counter-clockwise respectively.
+                                            */
+/* #define RETRO_ENVIRONMENT_GET_OVERSCAN     Removed due to lack of justifcation for why it can not be a core option.
+                                            * bool * --
+                                            * Boolean value whether or not the implementation should use overscan, 
+                                            * or crop away overscan.
+                                            */
+/* #define RETRO_ENVIRONMENT_GET_CAN_DUPE     Now mandatory.
+                                            * bool * --
+                                            * Boolean value whether or not frontend supports frame duping,
+                                            * passing NULL to video frame callback.
+                                            */
+/* #define RETRO_ENVIRONMENT_SET_PIXEL_FORMAT Now a function.
+                                            * const enum retro_pixel_format * --
+                                            * Sets the internal pixel format used by the implementation.
+                                            * The default pixel format is RETRO_PIXEL_FORMAT_0RGB1555.
+                                            * This pixel format however, is deprecated (see enum retro_pixel_format).
+                                            * If the call returns false, the frontend does not support this pixel 
+                                            * format.
+                                            *
+                                            * This function should be called inside retro_load_game() or 
+                                            * retro_get_system_av_info().
+                                            */
+/* #define RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME Now indicated by setting retro_system_info::valid_extensions to NULL.
+                                            * const bool * --
+                                            * If true, the libretro implementation supports calls to 
+                                            * retro_load_game() with NULL as argument.
+                                            * Used by cores which can run without particular game data.
+                                            * This should be called within retro_set_environment() only.
+                                            */
+/* #define RETRO_ENVIRONMENT_SET_PROC_ADDRESS_CALLBACK Now a function (retro_request).
+                                            * const struct retro_get_proc_address_interface * --
+                                            * Allows a libretro core to announce support for the 
+                                            * get_proc_address() interface.
+                                            * This interface allows for a standard way to extend libretro where 
+                                            * use of environment calls are too indirect,
+                                            * e.g. for cases where the frontend wants to call directly into the core.
+                                            *
+                                            * If a core wants to expose this interface, SET_PROC_ADDRESS_CALLBACK 
+                                            * **MUST** be called from within retro_set_environment().
                                             */
 
 /* The frontend will never change this memory area once retro_load_game has returned. */
