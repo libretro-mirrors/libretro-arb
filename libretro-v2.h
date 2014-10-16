@@ -471,8 +471,8 @@ enum retro_mod
                                             * This is now discouraged, and if possible, cores should try to 
                                             * use the new GET_SAVE_DIRECTORY.
                                             */
-#define RETRO_ENVIRONMENT_SET_PIXEL_FORMAT 10
-                                           /* const enum retro_pixel_format * --
+/* #define RETRO_ENVIRONMENT_SET_PIXEL_FORMAT Now a function.
+                                            * const enum retro_pixel_format * --
                                             * Sets the internal pixel format used by the implementation.
                                             * The default pixel format is RETRO_PIXEL_FORMAT_0RGB1555.
                                             * This pixel format however, is deprecated (see enum retro_pixel_format).
@@ -1642,23 +1642,17 @@ struct retro_disk_control_callback
 
 enum retro_pixel_format
 {
-   /* 0RGB1555, native endian.
-    * 0 bit must be set to 0.
-    * This pixel format is default for compatibility concerns only.
-    * If a 15/16-bit pixel format is desired, consider using RGB565. */
-   RETRO_PIXEL_FORMAT_0RGB1555 = 0,
-
-   /* XRGB8888, native endian.
-    * X bits are ignored. */
-   RETRO_PIXEL_FORMAT_XRGB8888 = 1,
-
    /* RGB565, native endian.
     * This pixel format is the recommended format to use if a 15/16-bit
     * format is desired as it is the pixel format that is typically 
     * available on a wide range of low-power devices.
     *
     * It is also natively supported in APIs like OpenGL ES. */
-   RETRO_PIXEL_FORMAT_RGB565   = 2,
+   RETRO_PIXEL_FORMAT_RGB565   = 0,
+
+   /* XRGB8888, native endian.
+    * X bits are ignored. */
+   RETRO_PIXEL_FORMAT_XRGB8888 = 1,
 
    /* Ensure sizeof() == sizeof(int). */
    RETRO_PIXEL_FORMAT_UNKNOWN  = INT_MAX
@@ -1846,6 +1840,10 @@ void retro_get_system_info(struct retro_system_info *info);
  * E.g. geom.aspect_ratio might not be initialized if core doesn't 
  * desire a particular aspect ratio. */
 void retro_get_system_av_info(struct retro_system_av_info *info);
+
+/* Tells the core which pixel format the front prefers, and asks the core if
+ * that is acceptable. The front will use the returned pixel format. */
+enum retro_pixel_format retro_get_pixel_format(enum retro_pixel_format);
 
 /* Sets device to be used for player 'port'.
  * By default, RETRO_DEVICE_JOYPAD is assumed to be plugged into all 
