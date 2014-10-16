@@ -1828,7 +1828,7 @@ void retro_set_audio_push(retro_audio_push_t);
 void retro_set_input_state(retro_input_state_t);
 
 /* Library global initialization/deinitialization. */
-void retro_init(void);
+bool retro_init(void);
 void retro_deinit(void);
 
 /* Must return RETRO_API_VERSION. Used to validate ABI compatibility
