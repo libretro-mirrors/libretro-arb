@@ -50,6 +50,22 @@ extern "C" {
 #define RETRO_API_VERSION         2
 
 /*
+ * Both of those structures are defined by the specific programs being run.
+ * The front hands out a retro_core_data* every time it calls into the core,
+ * and the core hands out a retro_front_data* for each call into the front.
+ * Neither party is allowed to dereference each others' data, and neither is
+ * required to be a valid pointer at all.
+ */
+struct retro_core_data;
+struct retro_front_data;
+
+/*
+ * This signals that the core does not support multi-instance, and that the
+ * previous instance must be destroyed before creating another one.
+ */
+#define RETRO_CORE_SINGLE_INSTANCE ((struct retro_core_data*)-1)
+
+/*
  * Libretro's fundamental device abstractions.
  *
  * Libretro's input system consists of some standardized device types,
@@ -544,7 +560,7 @@ struct retro_input_descriptor
  * character, character should be 0.
  */
 typedef void (*retro_keyboard_event_t)(bool down, unsigned keycode, 
-      uint32_t character, uint16_t key_modifiers);
+      uint32_t character, uint16_t key_modifiers, struct retro_core_data *core_handle);
 
 struct retro_keyboard_callback
 {
@@ -575,24 +591,24 @@ struct retro_keyboard_callback
 /* If ejected is true, "ejects" the virtual disk tray.
  * When ejected, the disk image index can be set.
  */
-typedef bool (*retro_set_eject_state_t)(bool ejected);
+typedef bool (*retro_set_eject_state_t)(bool ejected, struct retro_core_data *core_handle);
 
 /* Gets current eject state. The initial state is 'not ejected'. */
-typedef bool (*retro_get_eject_state_t)(void);
+typedef bool (*retro_get_eject_state_t)(struct retro_core_data *core_handle);
 
 /* Gets current disk index. First disk is index 0.
  * If return value is >= get_num_images(), no disk is currently inserted.
  */
-typedef unsigned (*retro_get_image_index_t)(void);
+typedef unsigned (*retro_get_image_index_t)(struct retro_core_data *core_handle);
 
 /* Sets image index. Can only be called when disk is ejected.
  * The implementation supports setting "no disk" by using an 
  * index >= get_num_images().
  */
-typedef bool (*retro_set_image_index_t)(unsigned index);
+typedef bool (*retro_set_image_index_t)(unsigned index, struct retro_core_data *core_handle);
 
 /* Gets total number of images which are available to use. */
-typedef unsigned (*retro_get_num_images_t)(void);
+typedef unsigned (*retro_get_num_images_t)(struct retro_core_data *core_handle);
 
 struct retro_game_info;
 
@@ -609,13 +625,13 @@ struct retro_game_info;
  * Index 1 will be removed, and the new index is 3.
  */
 typedef bool (*retro_replace_image_index_t)(unsigned index,
-      const struct retro_game_info *info);
+      const struct retro_game_info *info, struct retro_core_data *core_handle);
 
 /* Adds a new valid index (get_num_images()) to the internal disk list.
  * This will increment subsequent return values from get_num_images() by 1.
  * This image index cannot be used until a disk image has been set 
  * with replace_image_index. */
-typedef bool (*retro_add_image_index_t)(void);
+typedef bool (*retro_add_image_index_t)(struct retro_core_data *core_handle);
 
 struct retro_disk_control_callback
 {
@@ -656,16 +672,16 @@ struct retro_disk_control_callback
  * Also called first time video driver is initialized, 
  * allowing libretro core to initialize resources.
  */
-typedef void (*retro_hw_context_reset_t)(void);
+typedef void (*retro_hw_context_reset_t)(struct retro_core_data *core_handle);
 
 /* Gets current framebuffer which is to be rendered to.
  * Could change every frame potentially.
  */
-typedef uintptr_t (*retro_hw_get_current_framebuffer_t)(void);
+typedef uintptr_t (*retro_hw_get_current_framebuffer_t)(struct retro_front_data *front_handle);
 
 /* Get a symbol from HW context. */
 typedef void (*retro_proc_address_t)(void);
-typedef retro_proc_address_t (*retro_hw_get_proc_address_t)(const char *sym);
+typedef retro_proc_address_t (*retro_hw_get_proc_address_t)(const char *sym, struct retro_front_data *front_handle);
 
 enum retro_hw_context_type
 {
@@ -865,7 +881,7 @@ struct retro_variable
     * Separators have IDs, but their value must not be set or queried.
     * 'value' has the same type as 'default'.
     * Can be called during RETRO_ENVIRONMENT_SET_VARIABLES. */
-   void (*change_notify)(unsigned int id, void *value);
+   void (*change_notify)(unsigned int id, void *value, struct retro_core_data *core_handle);
 };
 
 struct retro_variable_query
@@ -904,7 +920,7 @@ struct retro_variable_query
                                             * SET_FRAME_TIME_CALLBACK.
                                             */
 /* Notifies libretro that audio data should be written. */
-typedef void (*retro_audio_callback_t)(void);
+typedef void (*retro_audio_callback_t)(struct retro_core_data *core_handle);
 
 /* True: Audio driver in frontend is active, and callback is 
  * expected to be called regularily.
@@ -913,7 +929,7 @@ typedef void (*retro_audio_callback_t)(void);
  * called with true.
  * Initial state is false (inactive).
  */
-typedef void (*retro_audio_set_state_callback_t)(bool enabled);
+typedef void (*retro_audio_set_state_callback_t)(bool enabled, struct retro_core_data *core_handle);
 
 struct retro_audio_callback
 {
@@ -940,7 +956,7 @@ struct retro_audio_callback
  *
  * In those scenarios the reference frame time value will be used. */
 typedef int64_t retro_usec_t;
-typedef void (*retro_frame_time_callback_t)(retro_usec_t usec);
+typedef void (*retro_frame_time_callback_t)(retro_usec_t usec, struct retro_core_data *core_handle);
 struct retro_frame_time_callback
 {
    retro_frame_time_callback_t callback;
@@ -974,7 +990,7 @@ enum retro_rumble_effect
  * Returns true if rumble state request was honored. 
  * Calling this before first retro_run() is likely to return false. */
 typedef bool (*retro_set_rumble_state_t)(unsigned port, 
-      enum retro_rumble_effect effect, uint16_t strength);
+      enum retro_rumble_effect effect, uint16_t strength, struct retro_front_data *front_handle);
 
 struct retro_rumble_interface
 {
@@ -1017,9 +1033,9 @@ enum retro_sensor_action
 #define RETRO_SENSOR_ACCELEROMETER_Z 2
 
 typedef bool (*retro_set_sensor_state_t)(unsigned port, 
-      enum retro_sensor_action action, unsigned rate);
+      enum retro_sensor_action action, unsigned rate, struct retro_front_data *front_handle);
 
-typedef float (*retro_sensor_get_input_t)(unsigned port, unsigned id);
+typedef float (*retro_sensor_get_input_t)(unsigned port, unsigned id, struct retro_front_data *front_handle);
 
 struct retro_sensor_interface
 {
@@ -1062,23 +1078,23 @@ enum retro_camera_buffer
 };
 
 /* Starts the camera driver. Can only be called in retro_run(). */
-typedef bool (*retro_camera_start_t)(void);
+typedef bool (*retro_camera_start_t)(struct retro_front_data *front_handle);
 
 /* Stops the camera driver. Can only be called in retro_run(). */
-typedef void (*retro_camera_stop_t)(void);
+typedef void (*retro_camera_stop_t)(struct retro_front_data *front_handle);
 
 /* Callback which signals when the camera driver is initialized 
  * and/or deinitialized.
  * retro_camera_start_t can be called in initialized callback.
  */
-typedef void (*retro_camera_lifetime_status_t)(void);
+typedef void (*retro_camera_lifetime_status_t)(struct retro_core_data *core_handle);
 
 /* A callback for raw framebuffer data. buffer points to an XRGB8888 buffer.
  * Width, height and pitch are similar to retro_video_refresh_t.
  * First pixel is top-left origin.
  */
 typedef void (*retro_camera_frame_raw_framebuffer_t)(const uint32_t *buffer, 
-      unsigned width, unsigned height, size_t pitch);
+      unsigned width, unsigned height, size_t pitch, struct retro_core_data *core_handle);
 
 /* A callback for when OpenGL textures are used.
  *
@@ -1099,7 +1115,7 @@ typedef void (*retro_camera_frame_raw_framebuffer_t)(const uint32_t *buffer,
  * the API definition.
  */
 typedef void (*retro_camera_frame_opengl_texture_t)(unsigned texture_id, 
-      unsigned texture_target, const float *affine);
+      unsigned texture_target, const float *affine, struct retro_core_data *core_handle);
 
 struct retro_camera_callback
 {
@@ -1153,7 +1169,7 @@ enum retro_log_level
 };
 
 /* Logging function. Takes log level argument as well. */
-typedef void (*retro_log_printf_t)(enum retro_log_level level,
+typedef void (*retro_log_printf_t)(struct retro_front_data *front_handle, enum retro_log_level level,
       const char *fmt, ...);
 
 struct retro_log_callback
@@ -1204,34 +1220,34 @@ struct retro_perf_counter
 /* Returns current time in microseconds.
  * Tries to use the most accurate timer available.
  */
-typedef retro_time_t (*retro_perf_get_time_usec_t)(void);
+typedef retro_time_t (*retro_perf_get_time_usec_t)(struct retro_front_data *front_handle);
 
 /* A simple counter. Usually nanoseconds, but can also be CPU cycles.
  * Can be used directly if desired (when creating a more sophisticated 
  * performance counter system).
  * */
-typedef retro_perf_tick_t (*retro_perf_get_counter_t)(void);
+typedef retro_perf_tick_t (*retro_perf_get_counter_t)(struct retro_front_data *front_handle);
 
 /* Returns a bit-mask of detected CPU features (RETRO_SIMD_*). */
-typedef uint64_t (*retro_get_cpu_features_t)(void);
+typedef uint64_t (*retro_get_cpu_features_t)(struct retro_front_data *front_handle);
 
 /* Asks frontend to log and/or display the state of performance counters.
  * Performance counters can always be poked into manually as well.
  */
-typedef void (*retro_perf_log_t)(void);
+typedef void (*retro_perf_log_t)(struct retro_front_data *front_handle);
 
 /* Register a performance counter.
  * ident field must be set with a discrete value and other values in 
  * retro_perf_counter must be 0.
  * Registering can be called multiple times. To avoid calling to 
  * frontend redundantly, you can check registered field first. */
-typedef void (*retro_perf_register_t)(struct retro_perf_counter *counter);
+typedef void (*retro_perf_register_t)(struct retro_perf_counter *counter, struct retro_front_data *front_handle);
 
 /* Starts a registered counter. */
-typedef void (*retro_perf_start_t)(struct retro_perf_counter *counter);
+typedef void (*retro_perf_start_t)(struct retro_perf_counter *counter, struct retro_front_data *front_handle);
 
 /* Stops a registered counter. */
-typedef void (*retro_perf_stop_t)(struct retro_perf_counter *counter);
+typedef void (*retro_perf_stop_t)(struct retro_perf_counter *counter, struct retro_front_data *front_handle);
 
 /* For convenience it can be useful to wrap register, start and stop in macros.
  * E.g.:
@@ -1296,27 +1312,27 @@ struct retro_perf_callback
  * interval_distance is the distance interval expressed in meters.
  */
 typedef void (*retro_location_set_interval_t)(unsigned interval_ms,
-      unsigned interval_distance);
+      unsigned interval_distance, struct retro_front_data *front_handle);
 
 /* Start location services. The device will start listening for changes to the
  * current location at regular intervals (which are defined with 
  * retro_location_set_interval_t). */
-typedef bool (*retro_location_start_t)(void);
+typedef bool (*retro_location_start_t)(struct retro_front_data *front_handle);
 
 /* Stop location services. The device will stop listening for changes 
  * to the current location. */
-typedef void (*retro_location_stop_t)(void);
+typedef void (*retro_location_stop_t)(struct retro_front_data *front_handle);
 
 /* Get the position of the current location. Will set parameters to 
  * 0 if no new  location update has happened since the last time. */
 typedef bool (*retro_location_get_position_t)(double *lat, double *lon,
-      double *horiz_accuracy, double *vert_accuracy);
+      double *horiz_accuracy, double *vert_accuracy, struct retro_front_data *front_handle);
 
 /* Callback which signals when the location driver is initialized 
  * and/or deinitialized.
  * retro_location_start_t can be called in initialized callback.
  */
-typedef void (*retro_location_lifetime_status_t)(void);
+typedef void (*retro_location_lifetime_status_t)(struct retro_core_data *core_handle);
 
 struct retro_location_callback
 {
@@ -1769,7 +1785,7 @@ struct retro_game_info
 
 /* Environment callback. Gives implementations a way of performing 
  * uncommon tasks. Extensible. */
-typedef bool (*retro_environment_t)(unsigned cmd, void *data);
+typedef bool (*retro_environment_t)(unsigned cmd, void *data, struct retro_front_data *front_handle);
 
 /* Render a frame. Pixel format is 15-bit 0RGB1555 native endian 
  * unless changed (see RETRO_ENVIRONMENT_SET_PIXEL_FORMAT).
@@ -1783,7 +1799,7 @@ typedef bool (*retro_environment_t)(unsigned cmd, void *data);
  * that are not packed in memory.
  */
 typedef void (*retro_video_refresh_t)(const void *data, unsigned width,
-      unsigned height, size_t pitch);
+      unsigned height, size_t pitch, struct retro_front_data *front_handle);
 
 /* Renders a chunk of audio.
  *
@@ -1791,7 +1807,7 @@ typedef void (*retro_video_refresh_t)(const void *data, unsigned width,
  * I.e. int16_t buf[4] = { l, r, l, r }; would be 2 frames.
  */
 typedef size_t (*retro_audio_push_t)(const int16_t *data,
-      size_t frames);
+      size_t frames, struct retro_front_data *front_handle);
 
 /* Queries for input for player 'port'. device will be masked with 
  * RETRO_DEVICE_MASK.
@@ -1801,23 +1817,35 @@ typedef size_t (*retro_audio_push_t)(const int16_t *data,
  * will still use the higher level RETRO_DEVICE_JOYPAD to request input.
  */
 typedef int16_t (*retro_input_state_t)(unsigned port, unsigned device, 
-      unsigned index, unsigned id);
+      unsigned index, unsigned id, struct retro_front_data *front_handle);
+
+/* Sets or gets the global frontend handle; that is, which front_handle to use
+ * when there is no associated core_handle.
+ * The getter allows a frontend to load the core and ask whether it's initialized already.
+ * If the front data is not set, it defaults to NULL.
+ * */
+void retro_set_front_data(struct retro_front_data *front_handle);
+struct retro_front_data *retro_get_front_data();
 
 /* Sets callbacks. retro_set_environment() is guaranteed to be called 
  * before retro_init().
  *
  * The rest of the set_* functions are guaranteed to have been called 
- * before the first call to retro_run() is made. */
-void retro_set_environment(retro_environment_t);
+ * before the first call to retro_run() is made.
+ *
+ * retro_set_environment also tells the core which front_handle to
+ * use before retro_load_game(). */
+void retro_set_environment(retro_environment_t, struct retro_front_data *front_handle);
 void retro_set_video_refresh(retro_video_refresh_t);
 void retro_set_audio_push(retro_audio_push_t);
 void retro_set_input_state(retro_input_state_t);
 
 /* This acts like reverse environment callbacks, allowing the core to export
  * more functions without changing ABI. */
-bool retro_request(unsigned cmd, void *data);
+bool retro_request(unsigned cmd, void *data, struct retro_core_data *core_handle);
 
-/* Library global initialization/deinitialization. */
+/* Library global initialization/deinitialization.
+ * If retro_init fails, retro_load_game must not be used. */
 bool retro_init(void);
 void retro_deinit(void);
 
@@ -1836,7 +1864,8 @@ void retro_get_system_info(struct retro_system_info *info);
  * variable if needed.
  * E.g. geom.aspect_ratio might not be initialized if core doesn't 
  * desire a particular aspect ratio. */
-void retro_get_system_av_info(struct retro_system_av_info *info);
+void retro_get_system_av_info(struct retro_system_av_info *info,
+                              struct retro_core_data *core_handle);
 
 enum retro_pixel_format
 {
@@ -1857,8 +1886,9 @@ enum retro_pixel_format
 };
 /* Tells the core which pixel format the front prefers, and asks the core if
  * that is acceptable. The core can override the choice if it wants to.
- * Can be called multiple times. The last return value applies. */
-enum retro_pixel_format retro_get_pixel_format(enum retro_pixel_format preferred);
+ * Can be called multiple times, but only before the first retro_run.
+ * The last return value applies. */
+enum retro_pixel_format retro_get_pixel_format(enum retro_pixel_format preferred, struct retro_core_data *core_handle);
 
 /* Sets device to be used for player 'port'.
  * By default, RETRO_DEVICE_JOYPAD is assumed to be plugged into all 
@@ -1868,10 +1898,10 @@ enum retro_pixel_format retro_get_pixel_format(enum retro_pixel_format preferred
  * hint to the libretro core when a core cannot automatically detect the 
  * appropriate input device type on its own. It is also relevant when a 
  * core can change its behavior depending on device type. */
-void retro_set_controller_port_device(unsigned port, unsigned device);
+void retro_set_controller_port_device(unsigned port, unsigned device, struct retro_core_data *core_handle);
 
 /* Resets the current game. */
-void retro_reset(void);
+void retro_reset(struct retro_core_data *core_handle);
 
 /* Runs the game for one video frame.
  * During retro_run(), input_poll callback must be called at least once.
@@ -1881,7 +1911,7 @@ void retro_reset(void);
  * a frame if GET_CAN_DUPE returns true.
  * In this case, the video callback can take a NULL argument for data.
  */
-void retro_run(void);
+void retro_run(struct retro_core_data *core_handle);
 
 /* Returns the amount of data the implementation requires to serialize 
  * internal state (save states).
@@ -1889,32 +1919,43 @@ void retro_run(void);
  * returned size is never allowed to be larger than a previous returned 
  * value, to ensure that the frontend can allocate a save state buffer once.
  */
-size_t retro_serialize_size(void);
+size_t retro_serialize_size(struct retro_core_data *core_handle);
 
 /* Serializes internal state. If failed, or size is lower than
  * retro_serialize_size(), it should return false, true otherwise. */
-bool retro_serialize(void *data, size_t size);
-bool retro_unserialize(const void *data, size_t size);
+bool retro_serialize(void *data, size_t size, struct retro_core_data *core_handle);
+bool retro_unserialize(const void *data, size_t size, struct retro_core_data *core_handle);
 
-/* Loads a game. */
-bool retro_load_game(const struct retro_game_info *game);
+/* Loads a game. The returned value is a valid
+ * retro_core_data (or RETRO_CORE_SINGLE_INSTANCE) on success,
+ * or NULL on failure.
+ *
+ * The given front_handle is to be used for all core-to-front
+ * calls related to this game.
+ *
+ * The front is responsible for not initializing the core twice,
+ * and unloading all games before deinitializing.
+ * */
+struct retro_core_data *retro_load_game(const struct retro_game_info *game,
+                                        struct retro_front_data *front_handle);
 
 /* Loads a "special" kind of game. Should not be used,
  * except in extreme cases. */
-bool retro_load_game_special(
+struct retro_core_data *retro_load_game_special(
   unsigned game_type,
-  const struct retro_game_info *info, size_t num_info
+  const struct retro_game_info *info, size_t num_info,
+  struct retro_front_data *front_handle
 );
 
 /* Unloads a currently loaded game. */
-void retro_unload_game(void);
+void retro_unload_game(struct retro_core_data *core_handle);
 
 /* Gets region of game. */
-unsigned retro_get_region(void);
+unsigned retro_get_region(struct retro_core_data *core_handle);
 
 /* Gets region of memory. */
-void *retro_get_memory_data(unsigned id);
-size_t retro_get_memory_size(unsigned id);
+void *retro_get_memory_data(unsigned id, struct retro_core_data *core_handle);
+size_t retro_get_memory_size(unsigned id, struct retro_core_data *core_handle);
 
 #ifdef __cplusplus
 }
