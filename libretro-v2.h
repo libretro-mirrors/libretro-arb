@@ -446,20 +446,55 @@ struct retro_message
                                             * particularly demanding.
                                             * If called, it should be called in retro_load_game().
                                             */
-#define RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY 9
-                                           /* const char ** --
-                                            * Returns the "system" directory of the frontend.
-                                            * This directory can be used to store system specific 
-                                            * content such as BIOSes, configuration data, etc.
+#define RETRO_ENVIRONMENT_GET_PATH 9
+                                           /* struct retro_path_query * --
+                                            * Returns various paths and directories which the core
+                                            * can use for whatever it wants.
                                             * The returned value can be NULL.
-                                            * If so, no such directory is defined,
-                                            * and it's up to the implementation to find a suitable directory.
-                                            *
-                                            * NOTE: Some cores used this folder also for "save" data such as 
-                                            * memory cards, etc, for lack of a better place to put it.
-                                            * This is now discouraged, and if possible, cores should try to 
-                                            * use the new GET_SAVE_DIRECTORY.
+                                            * If so, no such path is defined,
+                                            * and it's up to the implementation to find a suitable replacement.
                                             */
+enum retro_path_type {
+   /* The "system" directory can be used to store system specific 
+    * content such as BIOSes, configuration data, etc. */
+   RETRO_PATH_SYSTEM_DIR,
+
+   /* The core location is the absolute path from where this libretro
+    * implementation was loaded.
+    * NULL is returned if the libretro was loaded statically
+    * (i.e. linked statically to frontend), or if the path cannot be
+    * determined.
+    * Mostly useful in cooperation for game-less cores as assets can
+    * be loaded without ugly hacks.
+    */
+   RETRO_PATH_CORE_LOCATION,
+
+   /* Returns the "content" directory of the frontend.
+    * This directory can be used to store specific assets that the 
+    * core relies upon, such as art assets,
+    * input data, etc etc.
+    * The returned value can be NULL.
+    * If so, no such directory is defined,
+    * and it's up to the implementation to find a suitable directory.
+    */
+   RETRO_PATH_CONTENT_DIR,
+
+   /* Returns the "save" directory of the frontend.
+    * This directory can be used to store SRAM, memory cards, 
+    * high scores, etc, if the libretro core
+    * cannot use the regular memory interface (retro_get_memory_data()).
+    *
+    * The path here can be NULL. It should only be non-NULL if the 
+    * frontend user has set a specific save path.
+    */
+   RETRO_PATH_SAVE_DIR,
+};
+struct retro_path_query {
+	enum retro_path_type type;
+	const char ** path;
+};
+
+
 #define RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS 11
                                            /* const struct retro_input_descriptor * --
                                             * Sets an array of retro_input_descriptors.
@@ -842,20 +877,6 @@ struct retro_variable_query
 };
 
 
-#define RETRO_ENVIRONMENT_GET_LIBRETRO_PATH 19
-                                           /* const char ** --
-                                            * Retrieves the absolute path from where this libretro 
-                                            * implementation was loaded.
-                                            * NULL is returned if the libretro was loaded statically 
-                                            * (i.e. linked statically to frontend), or if the path cannot be 
-                                            * determined.
-                                            * Mostly useful in cooperation with SET_SUPPORT_NO_GAME as assets can 
-                                            * be loaded without ugly hacks.
-                                            */
-                                           
-                                           /* Environment 20 was an obsolete version of SET_AUDIO_CALLBACK. 
-                                            * It was not used by any known core at the time,
-                                            * and was removed from the API. */
 #define RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK 22
                                            /* const struct retro_audio_callback * --
                                             * Sets an interface which is used to notify a libretro core about audio 
@@ -1309,30 +1330,6 @@ struct retro_location_callback
 };
 
 
-#define RETRO_ENVIRONMENT_GET_CONTENT_DIRECTORY 30
-                                           /* const char ** --
-                                            * Returns the "content" directory of the frontend.
-                                            * This directory can be used to store specific assets that the 
-                                            * core relies upon, such as art assets,
-                                            * input data, etc etc.
-                                            * The returned value can be NULL.
-                                            * If so, no such directory is defined,
-                                            * and it's up to the implementation to find a suitable directory.
-                                            */
-#define RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY 31
-                                           /* const char ** --
-                                            * Returns the "save" directory of the frontend.
-                                            * This directory can be used to store SRAM, memory cards, 
-                                            * high scores, etc, if the libretro core
-                                            * cannot use the regular memory interface (retro_get_memory_data()).
-                                            *
-                                            * NOTE: libretro cores used to check GET_SYSTEM_DIRECTORY for 
-                                            * similar things before.
-                                            * They should still check GET_SYSTEM_DIRECTORY if they want to 
-                                            * be backwards compatible.
-                                            * The path here can be NULL. It should only be non-NULL if the 
-                                            * frontend user has set a specific save path.
-                                            */
 #define RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO 32
                                            /* const struct retro_system_av_info * --
                                             * Sets a new av_info structure. This can only be called from 
@@ -1705,8 +1702,7 @@ struct retro_system_info
     * Typically used for a GUI to filter out extensions.
     *
     * NULL means the core can run standalone and does not want any content;
-    * retro_load_game() should be called with NULL as argument.
-    */
+    * retro_load_game() should be called with NULL as argument. */
    const char * const * valid_extensions;
 
    /* If true, retro_load_game() is guaranteed to provide a valid pathname 
