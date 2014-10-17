@@ -1831,11 +1831,8 @@ struct retro_front_data *retro_get_front_data();
  * before retro_init().
  *
  * The rest of the set_* functions are guaranteed to have been called 
- * before the first call to retro_run() is made.
- *
- * retro_set_environment also tells the core which front_handle to
- * use before retro_load_game(). */
-void retro_set_environment(retro_environment_t, struct retro_front_data *front_handle);
+ * before the first call to retro_run() is made. */
+void retro_set_environment(retro_environment_t);
 void retro_set_video_refresh(retro_video_refresh_t);
 void retro_set_audio_push(retro_audio_push_t);
 void retro_set_input_state(retro_input_state_t);
