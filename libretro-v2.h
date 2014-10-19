@@ -51,17 +51,23 @@ extern "C" {
 
 /*
  * Both of those structures are defined by the specific programs being run.
- * The front hands out a retro_core_data* every time it calls into the core,
- * and the core hands out a retro_front_data* for each call into the front.
- * Neither party is allowed to dereference each others' data, and neither is
- * required to be a valid pointer at all.
+ * The front and core create their associated data, then give it to the other
+ * party; this other party is required to pass it around in the function
+ * arguments and otherwise treat it as an opaque handle.
+ *
+ * Note that functions returned from retro_hw_render_callback::get_proc_address
+ * don't want these arguments, as they do not end up in neither front nor core.
  */
 struct retro_core_data;
 struct retro_front_data;
 
 /*
- * This signals that the core does not support multi-instance, and that the
- * previous instance must be destroyed before creating another one.
+ * Returning this as core data signals that the core does not support
+ * multi-instance, and that this previous instance must be destroyed before
+ * creating another one.
+ *
+ * If the core data is anything else, the core allows executing multiple
+ * instances at once, including simultaneously from different threads.
  */
 #define RETRO_CORE_SINGLE_INSTANCE ((struct retro_core_data*)-1)
 
@@ -1822,7 +1828,9 @@ typedef int16_t (*retro_input_state_t)(unsigned port, unsigned device,
 /* Sets or gets the global frontend handle; that is, which front_handle to use
  * when there is no associated core_handle.
  * The getter allows a frontend to load the core and ask whether it's initialized already.
- * If the front data is not set, it defaults to NULL.
+ * If not set, it defaults to NULL.
+ * If the core does not support multi-instance, it is allowed to use the handle
+ * for the created game as the global frontend handle.
  * */
 void retro_set_front_data(struct retro_front_data *front_handle);
 struct retro_front_data *retro_get_front_data();
@@ -1842,7 +1850,8 @@ void retro_set_input_state(retro_input_state_t);
 bool retro_request(unsigned cmd, void *data, struct retro_core_data *core_handle);
 
 /* Library global initialization/deinitialization.
- * If retro_init fails, retro_load_game must not be used. */
+ * If retro_init fails, the core must be treated as not initialized;
+ * retro_load_game and retro_deinit are not allowed. */
 bool retro_init(void);
 void retro_deinit(void);
 
