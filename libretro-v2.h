@@ -209,10 +209,6 @@ struct retro_front_data;
 #define RETRO_DEVICE_ID_POINTER_Y         1
 #define RETRO_DEVICE_ID_POINTER_PRESSED   2
 
-/* Returned from retro_get_region(). */
-#define RETRO_REGION_NTSC  0
-#define RETRO_REGION_PAL   1
-
 /* Id values for LANGUAGE */
 enum retro_language
 {
@@ -1955,9 +1951,6 @@ struct retro_core_data *retro_load_game_special(
 
 /* Unloads a currently loaded game. */
 void retro_unload_game(struct retro_core_data *core_handle);
-
-/* Gets region of game. */
-unsigned retro_get_region(struct retro_core_data *core_handle);
 
 /* Gets region of memory. */
 void *retro_get_memory_data(unsigned id, struct retro_core_data *core_handle);
