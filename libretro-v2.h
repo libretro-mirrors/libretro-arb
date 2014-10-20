@@ -209,51 +209,6 @@ struct retro_front_data;
 #define RETRO_DEVICE_ID_POINTER_Y         1
 #define RETRO_DEVICE_ID_POINTER_PRESSED   2
 
-/* Id values for LANGUAGE */
-enum retro_language
-{
-   RETRO_LANGUAGE_ENGLISH             =  0,
-   RETRO_LANGUAGE_JAPANESE            =  1,
-   RETRO_LANGUAGE_FRENCH              =  2,
-   RETRO_LANGUAGE_SPANISH             =  3,
-   RETRO_LANGUAGE_GERMAN              =  4,
-   RETRO_LANGUAGE_ITALIAN             =  5,
-   RETRO_LANGUAGE_DUTCH               =  6,
-   RETRO_LANGUAGE_PORTUGUESE          =  7,
-   RETRO_LANGUAGE_RUSSIAN             =  8,
-   RETRO_LANGUAGE_KOREAN              =  9,
-   RETRO_LANGUAGE_CHINESE_TRADITIONAL = 10,
-   RETRO_LANGUAGE_CHINESE_SIMPLIFIED  = 11,
-   RETRO_LANGUAGE_LAST,
-
-   /* Ensure sizeof(enum) == sizeof(int) */
-   RETRO_LANGUAGE_DUMMY          = INT_MAX 
-};
-
-/* Passed to retro_get_memory_data/size().
- * If the memory type doesn't apply to the 
- * implementation NULL/0 can be returned.
- */
-#define RETRO_MEMORY_MASK        0xff
-
-/* Regular save RAM. This RAM is usually found on a game cartridge,
- * backed up by a battery.
- * If save game data is too complex for a single memory buffer,
- * the SAVE_DIRECTORY (preferably) or SYSTEM_DIRECTORY environment
- * callback can be used. */
-#define RETRO_MEMORY_SAVE_RAM    0
-
-/* Some games have a built-in clock to keep track of time.
- * This memory is usually just a couple of bytes to keep track of time.
- */
-#define RETRO_MEMORY_RTC         1
-
-/* System ram lets a frontend peek into a game systems main RAM. */
-#define RETRO_MEMORY_SYSTEM_RAM  2
-
-/* Video ram lets a frontend peek into a game systems video RAM (VRAM). */
-#define RETRO_MEMORY_VIDEO_RAM   3
-
 /* Keysyms used for ID in input state callback when polling RETRO_KEYBOARD. */
 enum retro_key
 {
@@ -1702,6 +1657,26 @@ struct retro_memory_map
                                             * Returns the specified language of the frontend, if specified by the user.
                                             * It can be used by the core for localization purposes.
                                             */
+/* Id values for LANGUAGE */
+enum retro_language
+{
+   RETRO_LANGUAGE_ENGLISH             =  0,
+   RETRO_LANGUAGE_JAPANESE            =  1,
+   RETRO_LANGUAGE_FRENCH              =  2,
+   RETRO_LANGUAGE_SPANISH             =  3,
+   RETRO_LANGUAGE_GERMAN              =  4,
+   RETRO_LANGUAGE_ITALIAN             =  5,
+   RETRO_LANGUAGE_DUTCH               =  6,
+   RETRO_LANGUAGE_PORTUGUESE          =  7,
+   RETRO_LANGUAGE_RUSSIAN             =  8,
+   RETRO_LANGUAGE_KOREAN              =  9,
+   RETRO_LANGUAGE_CHINESE_TRADITIONAL = 10,
+   RETRO_LANGUAGE_CHINESE_SIMPLIFIED  = 11,
+   RETRO_LANGUAGE_LAST,
+
+   /* Ensure sizeof(enum) == sizeof(int) */
+   RETRO_LANGUAGE_DUMMY          = INT_MAX 
+};
 
 
 
@@ -1955,6 +1930,30 @@ void retro_unload_game(struct retro_core_data *core_handle);
 /* Gets region of memory. */
 void *retro_get_memory_data(unsigned id, struct retro_core_data *core_handle);
 size_t retro_get_memory_size(unsigned id, struct retro_core_data *core_handle);
+
+/* Passed to retro_get_memory_data/size().
+ * If the memory type doesn't apply to the 
+ * implementation NULL/0 can be returned.
+ */
+#define RETRO_MEMORY_MASK        0xff
+
+/* Regular save RAM. This RAM is usually found on a game cartridge,
+ * backed up by a battery.
+ * If save game data is too complex for a single memory buffer,
+ * the SAVE_DIRECTORY (preferably) or SYSTEM_DIRECTORY environment
+ * callback can be used. */
+#define RETRO_MEMORY_SAVE_RAM    0
+
+/* Some games have a built-in clock to keep track of time.
+ * This memory is usually just a couple of bytes to keep track of time.
+ */
+#define RETRO_MEMORY_RTC         1
+
+/* System ram lets a frontend peek into a game systems main RAM. */
+#define RETRO_MEMORY_SYSTEM_RAM  2
+
+/* Video ram lets a frontend peek into a game systems video RAM (VRAM). */
+#define RETRO_MEMORY_VIDEO_RAM   3
 
 #ifdef __cplusplus
 }
