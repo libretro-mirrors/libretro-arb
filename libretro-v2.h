@@ -691,7 +691,7 @@ struct retro_hw_render_callback
    bool stencil;
 
    /* If depth and stencil are true, a packed 24/8 buffer will be added. 
-    * Only attaching stencil is invalid and will be ignored. */
+    * Only attaching stencil is invalid. */
 
    /* Use conventional bottom-left origin convention. If false, 
     * standard libretro top-left origin semantics are used. */
