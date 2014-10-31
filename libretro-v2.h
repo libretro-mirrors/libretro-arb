@@ -1683,7 +1683,7 @@ enum retro_language
 struct retro_system_info
 {
    /* All pointers are owned by libretro implementation, and pointers must 
-    * remain valid until retro_deinit() is called. */
+    * remain valid until the library is unloaded. */
 
    const char *library_name;      /* Descriptive name of library. Should not 
                                    * contain any version numbers, etc. */
