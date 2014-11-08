@@ -1881,12 +1881,10 @@ void retro_set_controller_port_device(unsigned port, unsigned device, struct ret
 void retro_reset(struct retro_core_data *core_handle);
 
 /* Runs the game for one video frame.
- * During retro_run(), input_poll callback must be called at least once.
  * 
  * If a frame is not rendered for reasons where a game "dropped" a frame,
- * this still counts as a frame, and retro_run() should explicitly dupe 
- * a frame if GET_CAN_DUPE returns true.
- * In this case, the video callback can take a NULL argument for data.
+ * this still counts as a frame, and retro_run() should call the video callback
+ * with a NULL argument for data.
  */
 void retro_run(struct retro_core_data *core_handle);
 
