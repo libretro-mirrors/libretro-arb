@@ -1912,7 +1912,7 @@ bool retro_unserialize(const void *data, size_t size, struct retro_core_data *co
  *
  * The front is responsible for not initializing the core twice,
  * and unloading all games before deinitializing.
- * */
+ */
 struct retro_core_data *retro_load_game(const struct retro_game_info *game,
                                         struct retro_front_data *front_handle);
 
