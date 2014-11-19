@@ -380,7 +380,13 @@ enum retro_mod
  * change or be removed at any time. */
 #define RETRO_ENVIRONMENT_EXPERIMENTAL 0x10000
 /* Environment callback to be used internally in frontend. */
-#define RETRO_ENVIRONMENT_PRIVATE 0x20000
+/* TODO: Figure out how exactly frontend-defined envs make sense for
+ * (1) dynamically linked cores; there are many different frontends, and if any
+ *     front loads a private core intended for another front, enjoy the fireworks
+ * (2) statically linked cores; statically linked cores can 'export' an extra
+ *     function which the dynamic loader ignores or replaces with a dummy
+ */
+/* #define RETRO_ENVIRONMENT_PRIVATE 0x20000 */
 
 /* Environment commands. */
 #define RETRO_ENVIRONMENT_SET_MESSAGE   6  /* const struct retro_message * --
