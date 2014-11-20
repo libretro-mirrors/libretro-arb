@@ -769,23 +769,29 @@ enum retro_variable_type
     * All other members are ignored for items of this type. */
    RETRO_VARIABLE_TYPE_SEPARATOR,
 
-   /* Enumeration. 'values' is const char * const *, with one entry
-    * for each item; terminated by a NULL. 'initial' is a const unsigned int *
-    * containing the index of the default value. */
+   /* Enumeration. 'values' is char**, with one entry for each item; terminated
+    * by a NULL.
+    * 'initial' is an unsigned int * containing the index of the default value. */
    RETRO_VARIABLE_TYPE_ENUM,
 
    /* Boolean. 'values' is NULL and 'initial' is bool*. */
    RETRO_VARIABLE_TYPE_BOOL,
 
-   /* Integer. 'values' is const int * containing two entries: the lowest and
-    * highest valid values, inclusive. 'initial' is also a const int *. */
+   /* Integer. 'values' is int* containing two entries: the lowest and
+    * highest valid values, inclusive. 'initial' is also int*, with one entry. */
    RETRO_VARIABLE_TYPE_INT,
-   
-   /* Floating point. Same as RETRO_VARIABLE_INT, except with 'float'
-    * instead of 'int'.
+
+   /* Floating point. Same as RETRO_VARIABLE_INT, except with 'float' instead of 'int'.
     * The frontend is responsible for calculating a reasonable step size. */
    RETRO_VARIABLE_TYPE_FLOAT,
-   
+
+   /* A resolution, for example output size.
+    * 'values' is NULL; valid sizes are between 1x1 and 65535x65535.
+    * The frontend should use retro_game_geometry and the monitor size to
+    * set reasonable bounds.
+    * 'initial' is unsigned int* with two entries (width and height). */
+   RETRO_VARIABLE_TYPE_RESOLUTION,
+
    RETRO_VARIABLE_TYPE_DUMMY = INT_MAX
 };
 
@@ -803,8 +809,8 @@ enum retro_variable_change
    RETRO_VARIABLE_CHANGE_RESET,
 
    /* This variable is currently ignored; it is only usable if other options are
-    * changed first. If they are, RETRO_ENVIRONMENT_SET_VARIABLES must be called
-    * again. */
+    * changed first. If these options get changed, RETRO_ENVIRONMENT_SET_VARIABLES
+    * must be called again. */
    RETRO_VARIABLE_CHANGE_WRONG_OPTS,
 
    /* This variable is not applicable for this game. */
@@ -842,7 +848,7 @@ struct retro_variable
     * Can be different for different variables.
     * ID is the index to the array given to RETRO_ENVIRONMENT_SET_VARIABLES.
     * Separators have IDs, but their value must not be set or queried.
-    * 'value' has the same type as 'default'.
+    * 'value' has the same type as 'initial'.
     * Can be called during RETRO_ENVIRONMENT_SET_VARIABLES. */
    void (*change_notify)(unsigned int id, void *value, struct retro_core_data *core_handle);
 };
