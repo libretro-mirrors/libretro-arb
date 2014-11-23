@@ -1701,8 +1701,7 @@ struct retro_system_info
                                    * contain any version numbers, etc. */
    const char *library_version;   /* Descriptive version of core. */
 
-   /* A string listing probably content extensions the core will be able to 
-    * load, separated with pipe.
+   /* A list of content extensions the core will be able to load.
     * I.e. { "bin", "rom", "iso", NULL}.
     * Typically used for a GUI to filter out extensions.
     *
