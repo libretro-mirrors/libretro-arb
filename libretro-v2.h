@@ -1775,8 +1775,7 @@ struct retro_game_info
  * uncommon tasks. Extensible. */
 typedef bool (*retro_environment_t)(unsigned cmd, void *data, struct retro_front_data *front_handle);
 
-/* Render a frame. Pixel format is 15-bit 0RGB1555 native endian 
- * unless changed (see RETRO_ENVIRONMENT_SET_PIXEL_FORMAT).
+/* Render a frame. Pixel format is as agreed by retro_get_pixel_format.
  *
  * Width and height specify dimensions of buffer.
  * Pitch specifices length in bytes between two lines in buffer.
