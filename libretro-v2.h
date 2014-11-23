@@ -1772,7 +1772,7 @@ struct retro_game_info
 /* Callbacks */
 
 /* Environment callback. Gives implementations a way of performing 
- * uncommon tasks. Extensible. */
+ * optional tasks. Extensible. */
 typedef bool (*retro_environment_t)(unsigned cmd, void *data, struct retro_front_data *front_handle);
 
 /* Render a frame. Pixel format is as agreed by retro_get_pixel_format.
