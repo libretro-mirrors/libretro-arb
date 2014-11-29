@@ -1729,6 +1729,24 @@ struct retro_system_info
    bool        block_extract;     
 };
 
+enum retro_pixel_format
+{
+   /* RGB565, native endian.
+    * This pixel format is the recommended format to use if a 15/16-bit
+    * format is desired as it is the pixel format that is typically 
+    * available on a wide range of low-power devices.
+    *
+    * It is also natively supported in APIs like OpenGL ES. */
+   RETRO_PIXEL_FORMAT_RGB565   = 0,
+
+   /* XRGB8888, native endian.
+    * X bits are ignored. */
+   RETRO_PIXEL_FORMAT_XRGB8888 = 1,
+
+   /* Ensure sizeof() == sizeof(int). */
+   RETRO_PIXEL_FORMAT_UNKNOWN  = INT_MAX
+};
+
 struct retro_game_geometry
 {
    unsigned base_width;    /* Nominal video width of game. */
@@ -1741,6 +1759,8 @@ struct retro_game_geometry
                             * of base_width / base_height is assumed.
                             * A frontend could override this setting,
                             * if desired. */
+
+   enum retro_pixel_format pix_fmt;
 };
 
 struct retro_system_timing
@@ -1775,7 +1795,7 @@ struct retro_game_info
  * optional tasks. Extensible. */
 typedef bool (*retro_environment_t)(unsigned cmd, void *data, struct retro_front_data *front_handle);
 
-/* Render a frame. Pixel format is as agreed by retro_get_pixel_format.
+/* Render a frame. Pixel format is as specified by retro_game_geometry.
  *
  * Width and height specify dimensions of buffer.
  * Pitch specifices length in bytes between two lines in buffer.
@@ -1853,29 +1873,6 @@ void retro_get_system_info(struct retro_system_info *info);
  * desire a particular aspect ratio. */
 void retro_get_system_av_info(struct retro_system_av_info *info,
                               struct retro_core_data *core_handle);
-
-enum retro_pixel_format
-{
-   /* RGB565, native endian.
-    * This pixel format is the recommended format to use if a 15/16-bit
-    * format is desired as it is the pixel format that is typically 
-    * available on a wide range of low-power devices.
-    *
-    * It is also natively supported in APIs like OpenGL ES. */
-   RETRO_PIXEL_FORMAT_RGB565   = 0,
-
-   /* XRGB8888, native endian.
-    * X bits are ignored. */
-   RETRO_PIXEL_FORMAT_XRGB8888 = 1,
-
-   /* Ensure sizeof() == sizeof(int). */
-   RETRO_PIXEL_FORMAT_UNKNOWN  = INT_MAX
-};
-/* Tells the core which pixel format the front prefers, and asks the core if
- * that is acceptable. The core can override the choice if it wants to.
- * Can be called multiple times, but only before the first retro_run.
- * The last return value applies. */
-enum retro_pixel_format retro_get_pixel_format(enum retro_pixel_format preferred, struct retro_core_data *core_handle);
 
 /* Sets device to be used for player 'port'.
  * By default, RETRO_DEVICE_JOYPAD is assumed to be plugged into all 
