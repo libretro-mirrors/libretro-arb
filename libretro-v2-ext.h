@@ -51,8 +51,8 @@ enum retro_variable_type
     * All other members are ignored for items of this type. */
    RETRO_VARIABLE_TYPE_SEPARATOR,
 
-   /* Enumeration. 'values' is char**, with one entry for each item; terminated
-    * by a NULL.
+   /* Enumeration. 'values' is const char * const *, with one entry for each
+    * item; terminated by a NULL.
     * 'initial' is an unsigned int * containing the index of the default value. */
    RETRO_VARIABLE_TYPE_ENUM,
 
