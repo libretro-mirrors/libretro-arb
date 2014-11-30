@@ -80,11 +80,11 @@ enum retro_variable_type
     * 'initial' is one of the RETRO_VARIABLE_FILE_* values.
     * 'value' in change_notify is const char * (null terminated). */
    RETRO_VARIABLE_TYPE_FILENAME,
-#define RETRO_VARIABLE_FILE_READONLY         (void*)1 /* The file must exist, the core will not write to it. */
-#define RETRO_VARIABLE_FILE_READWRITE_OPT    (void*)2 /* The file must exist, the core may write to it, but can handle a read-only file. */
-#define RETRO_VARIABLE_FILE_READWRITE        (void*)3 /* The file must exist and be readable and writable. */
-#define RETRO_VARIABLE_FILE_READWRITE_CREATE (void*)4 /* If the file exists, the core will use it, but the core can handle a nonexistent file. */
-#define RETRO_VARIABLE_FILE_WRITEONLY        (void*)5 /* The core will replace whatever is here, and doesn't care whether the file is writable. */
+#define RETRO_VARIABLE_FILE_READONLY            (void*)1 /* The file must exist. The core will only read it. */
+#define RETRO_VARIABLE_FILE_READWRITE_OR_READ   (void*)2 /* The file must exist. The core may write to it, but can handle a read-only file. */
+#define RETRO_VARIABLE_FILE_READWRITE           (void*)3 /* The file must exist; the core will both read and write to it. */
+#define RETRO_VARIABLE_FILE_READWRITE_OR_CREATE (void*)4 /* If the file exists, the core will use it, but the core can handle a nonexistent file. */
+#define RETRO_VARIABLE_FILE_WRITEONLY           (void*)5 /* The core will replace whatever is here, and doesn't care whether the file is writable. */
 
    RETRO_VARIABLE_TYPE_DUMMY = INT_MAX
 };
