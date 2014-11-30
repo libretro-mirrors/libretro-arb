@@ -20,6 +20,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+/* This specification is far from finished; do not use it unless you're part of the RetroArch team.
+ * It can and will change in incompatible ways without notice. */
+
 #ifndef LIBRETRO_H__
 #define LIBRETRO_H__
 
