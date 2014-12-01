@@ -67,6 +67,11 @@ enum retro_variable_type
     * The frontend is responsible for calculating a reasonable step size. */
    RETRO_VARIABLE_TYPE_FLOAT,
 
+   /* An arbitrary string, for data that does not match any of the defined categories.
+    * 'values' is NULL; 'initial' is const char *.
+    */
+   RETRO_VARIABLE_TYPE_STRING,
+
    /* A resolution, for example output size.
     * 'values' is NULL; valid sizes are between 1x1 and 65535x65535.
     * The frontend should use retro_game_geometry and the monitor size to
@@ -83,8 +88,8 @@ enum retro_variable_type
 #define RETRO_VARIABLE_FILE_READONLY            (void*)1 /* The file must exist. The core will only read it. */
 #define RETRO_VARIABLE_FILE_READWRITE_OR_READ   (void*)2 /* The file must exist. The core may write to it, but can handle a read-only file. */
 #define RETRO_VARIABLE_FILE_READWRITE           (void*)3 /* The file must exist; the core will both read and write to it. */
-#define RETRO_VARIABLE_FILE_READWRITE_OR_CREATE (void*)4 /* If the file exists, the core will use it, but the core can handle a nonexistent file. */
-#define RETRO_VARIABLE_FILE_WRITEONLY           (void*)5 /* The core will replace whatever is here, and doesn't care whether the file is writable. */
+#define RETRO_VARIABLE_FILE_READWRITE_OR_CREATE (void*)4 /* If the file exists, the core will use it; if not, the core will create it. */
+#define RETRO_VARIABLE_FILE_WRITEONLY           (void*)5 /* The core will replace whatever is here, and will destroy the previous contents. */
 
    RETRO_VARIABLE_TYPE_DUMMY = INT_MAX
 };
