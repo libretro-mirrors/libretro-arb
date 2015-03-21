@@ -43,26 +43,36 @@ extern "C" {
 #endif
 #endif
 
+#ifndef RETRO_CALLCONV
+#  if defined(__GNUC__) && defined(__i386__) && !defined(__x86_64__)
+#    define RETRO_CALLCONV __attribute__((cdecl))
+#  elif defined(_MSC_VER) && defined(_M_X86) && !defined(_M_X64)
+#    define RETRO_CALLCONV __cdecl
+#  else
+#    define RETRO_CALLCONV /* all other platforms only have one calling convention each */
+#  endif
+#endif
+
 #ifndef RETRO_API
 #  if defined(_WIN32) || defined(__CYGWIN__) || defined(__MINGW32__)
 #    ifdef RETRO_IMPORT_SYMBOLS
 #      ifdef __GNUC__
-#        define RETRO_API __attribute__((dllimport))
+#        define RETRO_API RETRO_CALLCONV __attribute__((dllimport))
 #      else
-#        define RETRO_API __declspec(dllimport)
+#        define RETRO_API RETRO_CALLCONV __declspec(dllimport)
 #      endif
 #    else
 #      ifdef __GNUC__
-#        define RETRO_API __attribute__((dllexport))
+#        define RETRO_API RETRO_CALLCONV __attribute__((dllexport))
 #      else
-#        define RETRO_API __declspec(dllexport)
+#        define RETRO_API RETRO_CALLCONV __declspec(dllexport)
 #      endif
 #    endif
 #  else
 #      if defined(__GNUC__) && __GNUC__ >= 4
-#        define RETRO_API __attribute__((visibility("default")))
+#        define RETRO_API RETRO_CALLCONV __attribute__((visibility("default")))
 #      else
-#        define RETRO_API
+#        define RETRO_API RETRO_CALLCONV
 #      endif
 #  endif
 #endif
