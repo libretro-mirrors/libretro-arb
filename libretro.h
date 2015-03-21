@@ -1829,17 +1829,25 @@ typedef int16_t (*retro_input_state_t)(unsigned port, unsigned device,
 
 #ifndef RETRO_API
 #  if defined(_WIN32) || defined(__CYGWIN__) || defined(__MINGW32__)
-#    ifdef __GNUC__
-#      define RETRO_API __attribute__((dllexport))
+#    ifdef RETRO_IMPORT_SYMBOLS
+#      ifdef __GNUC__
+#        define RETRO_API __attribute__((dllimport))
+#      else
+#        define RETRO_API __declspec(dllimport)
+#      endif
 #    else
-#      define RETRO_API __declspec(dllexport)
+#      ifdef __GNUC__
+#        define RETRO_API __attribute__((dllexport))
+#      else
+#        define RETRO_API __declspec(dllexport)
+#      endif
 #    endif
 #  else
-#    ifdef __GNUC__
-#      define RETRO_API __attribute__((visibility("default")))
-#    else
-#      define RETRO_API
-#    endif
+#      if defined(__GNUC__) && __GNUC__ >= 4
+#        define RETRO_API __attribute__((visibility("default")))
+#      else
+#        define RETRO_API
+#      endif
 #  endif
 #endif
 
